@@ -1,0 +1,19 @@
+log_level: info
+auth:
+  basic:
+    username:
+    password:
+ttp:
+  epix:
+    base_url:
+  gpas:
+    base_url:
+  #  auth:
+  #    basic:
+  #      username:
+  #      password:
+  retry:
+    count: 10
+    timeout: 10
+    wait: 5
+    max_wait: 20
