@@ -12,15 +12,15 @@ serde_derive = "1.0.228"
 serde = { version = "1.0.219", features = ["derive"] }
 env_logger = "0.11.8"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
-tower-http = { version = "0.6.6", features = ["trace", "cors"] }
-reqwest = "0.12.24"
+tower-http = { version = "0.6.6", features = ["trace"] }
+reqwest = { version = "0.12.24", default-features = false }
 log = "0.4.28"
 reqwest-middleware = "0.4.2"
 reqwest-retry = "0.7.0"
 fhir-model = { version = "0.12.1", default-features = false, features = ["r4b", "builders"] }
 serde_json = "1.0.145"
 chrono = { version = "0.4.42", features = ["serde"] }
-time = { version = "0.3.44", features = ["serde", "parsing"] }
+time = { version = "0.3.44", default-features = false, features = ["serde", "parsing"] }
 serde-xml-rs = "0.8.1"
 
 [dev-dependencies]

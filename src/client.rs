@@ -269,14 +269,20 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn test_new_ok() {
+    async fn test_connection_ok() {
         use httpmock::prelude::*;
 
         init();
         let server = MockServer::start();
-        let metadata_mock = server.mock(|when, then| {
+        let epix_metadata = server.mock(|when, then| {
             when.method(GET)
-                .path("/metadata")
+                .path("/ttp-fhir/fhir/epix/metadata")
+                .header_exists("Authorization");
+            then.status(200).body("OK");
+        });
+        let gpas_metadata = server.mock(|when, then| {
+            when.method(GET)
+                .path("/ttp-fhir/fhir/gpas/metadata")
                 .header_exists("Authorization");
             then.status(200).body("OK");
         });
@@ -285,21 +291,25 @@ pub(crate) mod tests {
         // create new client
         let client = FhirClient::new(&config.ttp).await;
 
-        // mock was called once
-        metadata_mock.assert();
+        // connection test
+        let test_result = client.unwrap().test_connection().await;
 
-        // assert client is created
-        assert!(client.is_ok());
+        // mocks were called once
+        epix_metadata.assert();
+        gpas_metadata.assert();
+
+        // assert client is created and initialized
+        assert!(test_result.is_ok());
     }
 
     #[tokio::test]
-    async fn test_new_error() {
+    async fn test_connection_error() {
         use httpmock::prelude::*;
 
         let server = MockServer::start();
         let metadata_mock = server.mock(|when, then| {
             when.method(GET)
-                .path("/metadata")
+                .path("/ttp-fhir/fhir/epix/metadata")
                 .header_exists("Authorization");
             then.status(404);
         });
@@ -308,10 +318,13 @@ pub(crate) mod tests {
         // create new client
         let client = FhirClient::new(&config.ttp).await;
 
+        // connection test
+        let test_result = client.unwrap().test_connection().await;
+
         // mock was called once
         metadata_mock.assert();
 
-        // assert client is created
-        assert!(client.is_err());
+        // assert client connection test failed
+        assert!(test_result.is_err());
     }
 }
