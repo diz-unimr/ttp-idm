@@ -7,9 +7,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{debug_handler, Json, Router};
-use fhir_model::r4b::resources::{
-    Parameters, ParametersParameter, ParametersParameterValue, Person,
-};
+use fhir_model::r4b::resources::{ParametersParameter, Person};
 use reqwest::StatusCode;
 
 pub(crate) fn router() -> Router<ApiContext> {
@@ -23,8 +21,9 @@ pub(crate) async fn create(
 ) -> Result<impl IntoResponse, ApiError> {
     // 1. create mpi in epix or return on conflict
     let res = ctx.client.add_person(payload.clone()).await?;
+
     // todo check matchStatus
-    // return 409 conflict on match
+    // return 409 conflict on match?
     let parts: Vec<ParametersParameter> = res
         .parameter
         .iter()
@@ -71,41 +70,13 @@ pub(crate) async fn create(
         ))?;
 
     // 2. create pseudonyms
-    // todo
-    let _response = ctx.client.add_domain(payload.study.as_str()).await?;
-
-    let psn_response = ctx.client.pseudonymize(mpi.clone(), payload).await?;
+    let (patient_id, lab_ids) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
 
     Ok((
         StatusCode::OK,
         Json(IdResponse {
-            patient_id: mpi,
-            lab_ids: parse_secondary(psn_response),
+            patient_id,
+            lab_ids,
         }),
     ))
-}
-
-fn parse_secondary(params: Parameters) -> Vec<String> {
-    params
-        .parameter
-        .iter()
-        .flatten()
-        .filter_map(|p| {
-            if p.name == "secondarypseudonym" {
-                Some(p.part.iter().flatten())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .filter_map(|p| match p.name.as_str() {
-            "value" => Some(p.part.iter().flatten()),
-            _ => None,
-        })
-        .flatten()
-        .filter_map(|p| match &p.value {
-            Some(ParametersParameterValue::Identifier(v)) => v.value.clone(),
-            _ => None,
-        })
-        .collect()
 }

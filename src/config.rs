@@ -24,25 +24,26 @@ pub(crate) struct Ttp {
     pub(crate) epix: Epix,
     pub(crate) gpas: Gpas,
     pub(crate) auth: Option<Auth>,
-    pub(crate) retry: Retry,
+    pub(crate) timeout: u64,
 }
 
-#[derive(Default, Deserialize, Clone)]
+#[derive(Default, Deserialize, Clone, Debug)]
 pub(crate) struct Epix {
     pub(crate) base_url: String,
+    pub(crate) domain: Domain,
+    pub(crate) identifier_domain: String,
+    pub(crate) data_source: String,
 }
 
-#[derive(Default, Deserialize, Clone)]
+#[derive(Default, Deserialize, Clone, Debug)]
+pub(crate) struct Domain {
+    pub(crate) name: String,
+    pub(crate) description: String,
+}
+
+#[derive(Default, Deserialize, Clone, Debug)]
 pub(crate) struct Gpas {
     pub(crate) base_url: String,
-}
-
-#[derive(Default, Debug, Deserialize, Clone)]
-pub(crate) struct Retry {
-    pub(crate) count: u32,
-    pub(crate) timeout: u64,
-    pub(crate) wait: u64,
-    pub(crate) max_wait: u64,
 }
 
 impl AppConfig {

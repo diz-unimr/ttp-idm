@@ -1,6 +1,6 @@
 use crate::api;
-use crate::client::FhirClient;
 use crate::config::{AppConfig, Auth};
+use crate::ttp::client::TtpClient;
 use axum::routing::get;
 use axum::Router;
 use log::info;
@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(Clone)]
 pub(crate) struct ApiContext {
     pub(crate) auth: Option<Auth>,
-    pub(crate) client: FhirClient,
+    pub(crate) client: TtpClient,
 }
 
 async fn root() -> &'static str {
@@ -28,9 +28,10 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| filter.into()))
         .init();
 
-    // FHIR REST client
-    let client = FhirClient::new(&config.ttp).await?;
+    // TTP client
+    let client = TtpClient::new(&config.ttp).await?;
     client.test_connection().await?;
+    client.setup_domains().await?;
 
     // context
     let state = ApiContext {
