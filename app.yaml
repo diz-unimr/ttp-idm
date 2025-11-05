@@ -6,14 +6,16 @@ auth:
 ttp:
   epix:
     base_url:
+    domain:
+      name: test
+      description: Test domain
+    identifier_domain: MPI
+    data_source: dummy_safe_source
   gpas:
     base_url:
+
   #  auth:
   #    basic:
   #      username:
   #      password:
-  retry:
-    count: 10
-    timeout: 10
-    wait: 5
-    max_wait: 20
+  timeout: 120

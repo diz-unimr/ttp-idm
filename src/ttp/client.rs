@@ -1,0 +1,457 @@
+use crate::api::IdRequest;
+use crate::config::{Epix, Gpas, Ttp};
+use crate::ttp::{epix, gpas};
+use anyhow::anyhow;
+use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
+use fhir_model::r4b::types::Coding;
+use log::{debug, error, info};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::{header, Client};
+use serde_derive::{Deserialize, Serialize};
+use std::time::Duration;
+
+#[derive(Debug, Clone)]
+pub(crate) struct TtpClient {
+    client: Client,
+    epix: Epix,
+    gpas: Gpas,
+}
+
+impl TtpClient {
+    pub(crate) async fn setup_domains(&self) -> Result<(), anyhow::Error> {
+        // epix
+        self.setup_epix_domains().await?;
+
+        Ok(())
+    }
+
+    async fn setup_epix_domains(&self) -> anyhow::Result<()> {
+        // create identifier domain
+        let soap = epix::create_id_domain_request(self.epix.identifier_domain.to_string());
+        self.create_epix_domain(soap.try_into()?).await?;
+
+        // create data source
+        let soap = epix::create_data_source_request(self.epix.data_source.to_string());
+        self.create_epix_domain(soap.try_into()?).await?;
+
+        // epix study domain
+        let soap = epix::create_domain_request(
+            self.epix.domain.name.to_string(),
+            self.epix.domain.description.to_string(),
+            self.epix.identifier_domain.to_string(),
+            self.epix.data_source.to_string(),
+        )?;
+
+        let body = soap.try_into()?;
+        self.create_epix_domain(body).await?;
+
+        Ok(())
+    }
+
+    async fn setup_gpas_domains(&self, study: &str) -> anyhow::Result<()> {
+        // gpas
+        // primary domain
+        let soap_request = gpas::create_domain_request(study.to_string(), None, None, false, None);
+        let body: String = soap_request.try_into()?;
+        self.create_gpas_domain(body).await?;
+
+        // secondary domain
+        let soap_request = gpas::create_domain_request(
+            format!("{study}_lab"),
+            None,
+            None,
+            true,
+            Some(study.to_string()),
+        );
+        let body: String = soap_request.try_into()?;
+        self.create_gpas_domain(body).await?;
+
+        Ok(())
+    }
+
+    async fn create_gpas_domain(&self, body: String) -> Result<(), anyhow::Error> {
+        let request = self
+            .client
+            .post(format!("{}/gpas/DomainService?wsdl", self.gpas.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+
+        // if no success, check if already created
+        if !response.status().is_success() {
+            let resp_text = response.text().await?;
+            FaultEnvelope::try_from(resp_text)?;
+        }
+
+        Ok(())
+    }
+
+    async fn create_epix_domain(&self, body: String) -> anyhow::Result<()> {
+        let request = self
+            .client
+            .post(format!("{}/epix/epixManagementService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+
+        // if no success, check if already created
+        if !response.status().is_success() {
+            let resp_text = response.text().await?;
+            let fault = FaultEnvelope::try_from(resp_text.clone())
+                .map_err(|_| anyhow!("Failed to create E-PIX domain: {resp_text}"))?;
+            debug!("E-PIX {}", fault.body.fault.faultstring);
+        }
+
+        Ok(())
+    }
+}
+
+impl TtpClient {
+    pub(crate) async fn new(config: &Ttp) -> Result<Self, anyhow::Error> {
+        // default headers
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/fhir+json"),
+        );
+        // set auth header as default
+        if let Some(auth) = config.auth.clone().and_then(|a| a.basic) {
+            // auth header
+            let auth_value =
+                create_auth_header(auth.username.as_str(), Some(auth.password.as_str()));
+            headers.insert(header::AUTHORIZATION, auth_value);
+        };
+
+        // http client
+        let client = Client::builder()
+            .default_headers(headers.clone())
+            .timeout(Duration::from_secs(config.timeout))
+            .build()?;
+
+        Ok(TtpClient {
+            client,
+            epix: config.epix.clone(),
+            gpas: config.gpas.clone(),
+        })
+    }
+
+    pub(crate) async fn test_connection(&self) -> anyhow::Result<()> {
+        // test epix
+        self.get_metadata(format!("{}/ttp-fhir/fhir/epix", self.epix.base_url).as_str())
+            .await?;
+        info!("Connection test to E-PIX successful");
+
+        // test gpas
+        self.get_metadata(format!("{}/ttp-fhir/fhir/gpas", self.gpas.base_url).as_str())
+            .await?;
+        info!("Connection test to gPAS successful");
+
+        Ok(())
+    }
+
+    async fn get_metadata(&self, base_url: &str) -> anyhow::Result<()> {
+        let metadata = format!("{}/metadata", base_url);
+        match self.client.get(metadata.as_str()).send().await {
+            Ok(resp) => {
+                if resp.status().is_success() {
+                    Ok(())
+                } else {
+                    Err(anyhow!(
+                        "Metadata response returned error code: {}",
+                        resp.status()
+                    ))
+                }
+            }
+
+            Err(e) => {
+                error!("Connection failed, {e}");
+                Err(e.into())
+            }
+        }
+    }
+
+    pub(crate) async fn add_person(&self, idat: IdRequest) -> Result<Parameters, anyhow::Error> {
+        let body = Parameters::builder()
+            .parameter(vec![
+                Some(
+                    ParametersParameter::builder()
+                        .name("domain".to_string())
+                        .value(ParametersParameterValue::String(
+                            self.epix.domain.name.clone(),
+                        ))
+                        .build()?,
+                ),
+                Some(
+                    ParametersParameter::builder()
+                        .name("source".to_string())
+                        .value(ParametersParameterValue::String(
+                            self.epix.data_source.clone(),
+                        ))
+                        .build()?,
+                ),
+                Some(
+                    ParametersParameter::builder()
+                        .name("identity".to_string())
+                        .resource(idat.try_into()?)
+                        .build()?,
+                ),
+                Some(
+                    ParametersParameter::builder()
+                        .name("saveAction".to_string())
+                        .value(ParametersParameterValue::Coding(
+                            Coding::builder()
+                                .system(
+                                    "https://ths-greifswald.de/fhir/CodeSystem/epix/SaveAction"
+                                        .to_string(),
+                                )
+                                .code("DONT_SAVE_ON_PERFECT_MATCH_EXCEPT_CONTACTS".to_string())
+                                .build()?,
+                        ))
+                        .build()?,
+                ),
+                Some(
+                    ParametersParameter::builder()
+                        .name("forceReferenceUpdate".to_string())
+                        .value(ParametersParameterValue::Boolean(false))
+                        .build()?,
+                ),
+            ])
+            .build()?;
+
+        let request = self
+            .client
+            .post(format!("{}/ttp-fhir/fhir/epix/$addPatient", self.epix.base_url).as_str())
+            .body(serde_json::to_string(&body)?);
+
+        let response = request.send().await?;
+
+        Ok(serde_json::from_str(response.text().await?.as_str())?)
+    }
+
+    pub(crate) async fn pseudonymize(
+        &self,
+        mpi: String,
+        id_request: IdRequest,
+    ) -> Result<(String, Vec<String>), anyhow::Error> {
+        // create study domains
+        self.setup_gpas_domains(&id_request.study).await?;
+
+        // pseudonymize mpi
+        let mpi_psn = self
+            .pseudonymize_mpi(id_request.study.clone(), mpi.clone())
+            .await?;
+
+        // pseudonymize secondary
+        let secondary_psn = match id_request.lab_id_count {
+            1.. => {
+                self.pseudonymize_secondary(
+                    id_request.study,
+                    mpi,
+                    id_request.lab_id_count.to_string(),
+                )
+                .await?
+            }
+            _ => vec![],
+        };
+
+        Ok((mpi_psn, secondary_psn))
+    }
+
+    async fn pseudonymize_mpi(&self, study: String, mpi: String) -> anyhow::Result<String> {
+        let body = gpas::create_psn_request(study, mpi)?;
+        let request = self
+            .client
+            .post(
+                format!(
+                    "{}/ttp-fhir/fhir/gpas/$pseudonymizeAllowCreate",
+                    self.gpas.base_url
+                )
+                .as_str(),
+            )
+            .body(serde_json::to_string(&body)?);
+
+        let response = request.send().await?;
+        let params = serde_json::from_str(response.text().await?.as_str())?;
+        gpas::parse_pseudonym(params)
+    }
+
+    async fn pseudonymize_secondary(
+        &self,
+        study: String,
+        mpi: String,
+        count: String,
+    ) -> anyhow::Result<Vec<String>> {
+        let body = gpas::create_secondary_psn_request(format!("{study}_lab"), mpi, count)?;
+        let request = self
+            .client
+            .post(
+                format!(
+                    "{}/ttp-fhir/fhir/gpas/$pseudonymize-secondary",
+                    self.gpas.base_url
+                )
+                .as_str(),
+            )
+            .body(serde_json::to_string(&body)?);
+
+        let response = request.send().await?;
+        let body = response.text().await?;
+        let params = serde_json::from_str(body.as_str())?;
+        Ok(gpas::parse_secondary(params))
+    }
+}
+
+fn create_auth_header(user: &str, password: Option<&str>) -> HeaderValue {
+    let builder = Client::new()
+        .get("http://localhost")
+        .basic_auth(user, password);
+
+    builder
+        .build()
+        .unwrap()
+        .headers()
+        .get(AUTHORIZATION)
+        .unwrap()
+        .clone()
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename = "soap:Envelope")]
+pub(crate) struct FaultEnvelope {
+    #[serde(rename = "soap:Body")]
+    pub(crate) body: FaultBody,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct FaultBody {
+    #[serde(rename = "soap:Fault")]
+    pub(crate) fault: Fault,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct Fault {
+    pub(crate) faultcode: String,
+    pub(crate) faultstring: String,
+    pub(crate) detail: FaultException,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) enum FaultException {
+    #[serde(rename = "ns1:DomainInUseException")]
+    DomainInUseException(()),
+    #[serde(rename = "ns1:DuplicateEntryException")]
+    DuplicateEntryException(()),
+}
+
+impl TryFrom<String> for FaultEnvelope {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let config = serde_xml_rs::SerdeXml::new()
+            .namespace("ns1", "http://psn.ttp.ganimed.icmvc.emau.org/")
+            .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
+            .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
+
+        let env: Self = config.from_str(value.as_str())?;
+        Ok(env)
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use crate::config::{AppConfig, Auth, BasicAuth, Epix, Gpas, Ttp};
+    use crate::ttp::client::TtpClient;
+
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+    pub(crate) fn setup_config(base_url: String) -> AppConfig {
+        AppConfig {
+            ttp: Ttp {
+                epix: Epix {
+                    base_url: base_url.clone(),
+                    domain: Default::default(),
+                    identifier_domain: Default::default(),
+                    data_source: Default::default(),
+                },
+                gpas: Gpas { base_url },
+                auth: Some(Auth {
+                    basic: Some(BasicAuth {
+                        username: "foo".to_string(),
+                        password: "bar".to_string(),
+                    }),
+                }),
+                timeout: 5,
+            },
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_connection_ok() {
+        use httpmock::prelude::*;
+
+        init();
+        let server = MockServer::start();
+        let epix_metadata = server.mock(|when, then| {
+            when.method(GET)
+                .path("/ttp-fhir/fhir/epix/metadata")
+                .header_exists("Authorization");
+            then.status(200).body("OK");
+        });
+        let gpas_metadata = server.mock(|when, then| {
+            when.method(GET)
+                .path("/ttp-fhir/fhir/gpas/metadata")
+                .header_exists("Authorization");
+            then.status(200).body("OK");
+        });
+
+        let config = setup_config(server.base_url());
+        // create new client
+        let client = TtpClient::new(&config.ttp).await;
+
+        // connection test
+        let test_result = client.unwrap().test_connection().await;
+
+        // mocks were called once
+        epix_metadata.assert();
+        gpas_metadata.assert();
+
+        // assert client is created and initialized
+        assert!(test_result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_connection_error() {
+        use httpmock::prelude::*;
+
+        let server = MockServer::start();
+        let metadata_mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/ttp-fhir/fhir/epix/metadata")
+                .header_exists("Authorization");
+            then.status(404);
+        });
+
+        let config = setup_config(server.base_url());
+        // create new client
+        let client = TtpClient::new(&config.ttp).await;
+
+        // connection test
+        let test_result = client.unwrap().test_connection().await;
+
+        // mock was called once
+        metadata_mock.assert();
+
+        // assert client connection test failed
+        assert!(test_result.is_err());
+    }
+}

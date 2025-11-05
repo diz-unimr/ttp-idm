@@ -1,19 +1,33 @@
 use crate::config::AppConfig;
+use anyhow::anyhow;
+use log::{error, info};
 
-mod config;
-mod server;
 mod api;
-mod client;
+mod config;
 mod error;
 mod model;
+mod server;
+mod ttp;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // config
-    let config = AppConfig::new().expect("Failed to load config");
+    let config = match AppConfig::new() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Failed to load config");
+            return Err(anyhow!(e));
+        }
+    };
 
     // run
-    server::serve(config).await?;
+    match server::serve(config).await {
+        Ok(_) => info!("Server stopped"),
+        Err(e) => {
+            error!("Server stopped: {e}");
+            return Err(e);
+        }
+    }
 
     Ok(())
 }

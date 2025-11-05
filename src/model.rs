@@ -13,11 +13,6 @@ pub(crate) struct IdResponse {
     pub(crate) lab_ids: Vec<String>,
 }
 
-#[derive(Deserialize)]
-pub(crate) struct MpiConflictResponse {
-    // todo
-}
-
 #[derive(Deserialize, Clone)]
 pub(crate) struct IdRequest {
     first_name: String,
@@ -28,7 +23,7 @@ pub(crate) struct IdRequest {
     postal_code: String,
     city: String,
     pub(crate) study: String,
-    lab_id_count: u32,
+    pub(crate) lab_id_count: u32,
 }
 
 impl TryInto<Patient> for IdRequest {

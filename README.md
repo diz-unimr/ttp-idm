@@ -118,10 +118,7 @@ Application properties are read from a properties file ([app.yaml](./app.yaml)) 
 | `auth.basic.password` |         | Basic auth password for this service    |          |
 | `ttp.epix.base_url`   |         | E-PIX base url                          | ✓        |
 | `ttp.epix.base_url`   |         | gPAS base url                           | ✓        |
-| `ttp.retry.count`     | 10      | Retry count                             |          |
-| `ttp.retry.timeout`   | 10      | Retry timeout                           |          |
-| `ttp.retry.wait`      | 5       | Retry wait between retries              |          |
-| `ttp.retry.max_wait`  | 20      | Retry maximum wait                      |          |
+| `ttp.timeout`         | 120     | Retry timeout                           |          |
 
 ### Environment variables
 
