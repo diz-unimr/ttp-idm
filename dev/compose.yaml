@@ -1,10 +1,9 @@
 services:
-
   mysql:
     image: mysql:8.0.30
     container_name: mysql
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: 'true'
+      MYSQL_ALLOW_EMPTY_PASSWORD: "true"
     volumes:
       - ./sqls:/docker-entrypoint-initdb.d
     command: --max_allowed_packet=20M --default-time-zone=Europe/Berlin
