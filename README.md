@@ -111,14 +111,18 @@ The property `lab_id_count` determines the number of secondary pseudonyms to be 
 
 Application properties are read from a properties file ([app.yaml](./app.yaml)) with default values.
 
-| Name                  | Default | Description                             | Required |
-|-----------------------|---------|-----------------------------------------|----------|
-| `log_level`           | info    | Log level (error,warn,info,debug,trace) |          |
-| `auth.basic.username` |         | Basic auth username for this service    |          |
-| `auth.basic.password` |         | Basic auth password for this service    |          |
-| `ttp.epix.base_url`   |         | E-PIX base url                          | ✓        |
-| `ttp.epix.base_url`   |         | gPAS base url                           | ✓        |
-| `ttp.timeout`         | 120     | Retry timeout                           |          |
+| Name                          | Default           | Description                             | Required |
+|-------------------------------|-------------------|-----------------------------------------|----------|
+| `log_level`                   | info              | Log level (error,warn,info,debug,trace) |          |
+| `auth.basic.username`         |                   | Basic auth username for this service    |          |
+| `auth.basic.password`         |                   | Basic auth password for this service    |          |
+| `ttp.epix.base_url`           |                   | E-PIX base url                          | ✓        |
+| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        | ✓        |
+| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            | ✓        |
+| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             | ✓        |
+| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    | ✓        |
+| `ttp.gpas.base_url`           |                   | gPAS base url                           | ✓        |
+| `ttp.timeout`                 | 120               | Retry timeout                           |          |
 
 ### Environment variables
 
