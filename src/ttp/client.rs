@@ -122,13 +122,6 @@ impl TtpClient {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/fhir+json"),
         );
-        // set auth header as default
-        if let Some(auth) = config.auth.clone().and_then(|a| a.basic) {
-            // auth header
-            let auth_value =
-                create_auth_header(auth.username.as_str(), Some(auth.password.as_str()));
-            headers.insert(header::AUTHORIZATION, auth_value);
-        };
 
         // http client
         let client = Client::builder()
@@ -366,8 +359,9 @@ impl TryFrom<String> for FaultEnvelope {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::config::{AppConfig, Auth, BasicAuth, Epix, Gpas, Ttp};
+    use crate::config::{AppConfig, Epix, Gpas, Ttp};
     use crate::ttp::client::TtpClient;
+    use reqwest::header::CONTENT_TYPE;
 
     fn init() {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -383,12 +377,6 @@ pub(crate) mod tests {
                     data_source: Default::default(),
                 },
                 gpas: Gpas { base_url },
-                auth: Some(Auth {
-                    basic: Some(BasicAuth {
-                        username: "foo".to_string(),
-                        password: "bar".to_string(),
-                    }),
-                }),
                 timeout: 5,
             },
             ..Default::default()
@@ -404,13 +392,13 @@ pub(crate) mod tests {
         let epix_metadata = server.mock(|when, then| {
             when.method(GET)
                 .path("/ttp-fhir/fhir/epix/metadata")
-                .header_exists("Authorization");
+                .header_exists(CONTENT_TYPE.as_str());
             then.status(200).body("OK");
         });
         let gpas_metadata = server.mock(|when, then| {
             when.method(GET)
                 .path("/ttp-fhir/fhir/gpas/metadata")
-                .header_exists("Authorization");
+                .header_exists(CONTENT_TYPE.as_str());
             then.status(200).body("OK");
         });
 
@@ -437,7 +425,7 @@ pub(crate) mod tests {
         let metadata_mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/ttp-fhir/fhir/epix/metadata")
-                .header_exists("Authorization");
+                .header_exists(CONTENT_TYPE.as_str());
             then.status(404);
         });
 

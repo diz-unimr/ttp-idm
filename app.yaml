@@ -13,9 +13,4 @@ ttp:
     data_source: dummy_safe_source
   gpas:
     base_url:
-
-  #  auth:
-  #    basic:
-  #      username:
-  #      password:
   timeout: 120

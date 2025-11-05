@@ -23,7 +23,6 @@ pub(crate) struct BasicAuth {
 pub(crate) struct Ttp {
     pub(crate) epix: Epix,
     pub(crate) gpas: Gpas,
-    pub(crate) auth: Option<Auth>,
     pub(crate) timeout: u64,
 }
 
