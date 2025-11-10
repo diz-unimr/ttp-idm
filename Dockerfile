@@ -24,6 +24,7 @@ RUN addgroup -g $GID $GROUP && \
 WORKDIR /app/
 COPY --from=build /app/target/release/ttp-idm ./
 COPY ./app.yaml ./
+COPY ./resources/matching_config.xml ./resources/matching_config.xml
 USER $USER
 EXPOSE 3000
 
