@@ -70,13 +70,7 @@ pub(crate) async fn create(
         ))?;
 
     // 2. create pseudonyms
-    let (patient_id, lab_ids) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
+    let (patient_id, lab) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
 
-    Ok((
-        StatusCode::OK,
-        Json(IdResponse {
-            patient_id,
-            lab_ids,
-        }),
-    ))
+    Ok((StatusCode::OK, Json(IdResponse { patient_id, lab })))
 }
