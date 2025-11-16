@@ -8,6 +8,7 @@ use log::{debug, error, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::{header, Client};
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -48,23 +49,29 @@ impl TtpClient {
         Ok(())
     }
 
-    async fn setup_gpas_domains(&self, study: &str) -> anyhow::Result<()> {
+    async fn setup_gpas_domains(
+        &self,
+        study: &str,
+        lab: &HashMap<String, u32>,
+    ) -> anyhow::Result<()> {
         // gpas
         // primary domain
         let soap_request = gpas::create_domain_request(study.to_string(), None, None, false, None);
         let body: String = soap_request.try_into()?;
         self.create_gpas_domain(body).await?;
 
-        // secondary domain
-        let soap_request = gpas::create_domain_request(
-            format!("{study}_lab"),
-            None,
-            None,
-            true,
-            Some(study.to_string()),
-        );
-        let body: String = soap_request.try_into()?;
-        self.create_gpas_domain(body).await?;
+        // lab (sub) domains
+        for l in lab.keys() {
+            let soap_request = gpas::create_domain_request(
+                format!("{study}_{l}"),
+                None,
+                None,
+                true,
+                Some(study.to_string()),
+            );
+            let body: String = soap_request.try_into()?;
+            self.create_gpas_domain(body).await?;
+        }
 
         Ok(())
     }
@@ -233,29 +240,33 @@ impl TtpClient {
         &self,
         mpi: String,
         id_request: IdRequest,
-    ) -> Result<(String, Vec<String>), anyhow::Error> {
+    ) -> Result<(String, HashMap<String, Vec<String>>), anyhow::Error> {
         // create study domains
-        self.setup_gpas_domains(&id_request.study).await?;
+        self.setup_gpas_domains(&id_request.study, &id_request.lab)
+            .await?;
 
         // pseudonymize mpi
         let mpi_psn = self
             .pseudonymize_mpi(id_request.study.clone(), mpi.clone())
             .await?;
 
-        // pseudonymize secondary
-        let secondary_psn = match id_request.lab_id_count {
-            1.. => {
-                self.pseudonymize_secondary(
-                    id_request.study,
-                    mpi,
-                    id_request.lab_id_count.to_string(),
-                )
-                .await?
+        // pseudonymize lab ids with mpi value
+        let mut lab_ids = HashMap::<String, Vec<String>>::new();
+        for (domain, count) in &id_request.lab {
+            if *count > 0 {
+                let ids = self
+                    .pseudonymize_secondary(
+                        &id_request.study,
+                        domain,
+                        mpi.clone(),
+                        count.to_string(),
+                    )
+                    .await?;
+                lab_ids.insert(domain.clone(), ids);
             }
-            _ => vec![],
-        };
+        }
 
-        Ok((mpi_psn, secondary_psn))
+        Ok((mpi_psn, lab_ids))
     }
 
     async fn pseudonymize_mpi(&self, study: String, mpi: String) -> anyhow::Result<String> {
@@ -278,11 +289,12 @@ impl TtpClient {
 
     async fn pseudonymize_secondary(
         &self,
-        study: String,
+        study: &str,
+        lab: &str,
         mpi: String,
         count: String,
     ) -> anyhow::Result<Vec<String>> {
-        let body = gpas::create_secondary_psn_request(format!("{study}_lab"), mpi, count)?;
+        let body = gpas::create_secondary_psn_request(format!("{study}_{lab}"), mpi, count)?;
         let request = self
             .client
             .post(

@@ -43,6 +43,26 @@ struct DomainConfig {
     send_notifications_web: bool,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename = "soap:Envelope")]
+pub(crate) struct GetPseudonymsForEnvelope {
+    #[serde(rename = "soap:Body")]
+    body: GetPseudonymsForBody,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct GetPseudonymsForBody {
+    #[serde(rename = "psn:getPseudonymsFor")]
+    get_pseudonyms_for: GetPseudonymsFor,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+struct GetPseudonymsFor {
+    value: String,
+    domain_name: String,
+}
+
 impl TryInto<String> for AddDomainEnvelope {
     type Error = anyhow::Error;
 
@@ -105,6 +125,17 @@ pub(crate) fn create_psn_request(
             ),
         ])
         .build()
+}
+
+pub(crate) fn get_secondary_psn_request(domain: String, value: String) -> GetPseudonymsForEnvelope {
+    GetPseudonymsForEnvelope {
+        body: GetPseudonymsForBody {
+            get_pseudonyms_for: GetPseudonymsFor {
+                value,
+                domain_name: domain,
+            },
+        },
+    }
 }
 
 pub(crate) fn create_secondary_psn_request(

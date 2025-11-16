@@ -4,13 +4,13 @@ use fhir_model::r4b::resources::{Patient, Resource};
 use fhir_model::r4b::types::{Address, Extension, ExtensionValue, HumanName, Meta};
 use fhir_model::Date;
 use serde_derive::{Deserialize, Serialize};
+use std::collections::HashMap;
 use time::error::ComponentRange;
 
 #[derive(Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
 pub(crate) struct IdResponse {
     pub(crate) patient_id: String,
-    pub(crate) lab_ids: Vec<String>,
+    pub(crate) lab: HashMap<String, Vec<String>>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -23,7 +23,7 @@ pub(crate) struct IdRequest {
     postal_code: String,
     city: String,
     pub(crate) study: String,
-    pub(crate) lab_id_count: u32,
+    pub(crate) lab: HashMap<String, u32>,
 }
 
 impl TryInto<Patient> for IdRequest {
