@@ -5,6 +5,7 @@ use axum::routing::get;
 use axum::Router;
 use log::info;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
@@ -34,16 +35,12 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     client.setup_domains().await?;
 
     // context
-    let state = ApiContext {
+    let state = Arc::new(ApiContext {
         auth: config.auth.clone(),
         client,
-    };
+    });
 
-    let router = Router::new()
-        .route("/", get(root))
-        .merge(api::router())
-        .with_state(state)
-        .layer(TraceLayer::new_for_http());
+    let router = build_router(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
     info!("Listening on {}", listener.local_addr()?);
@@ -53,4 +50,43 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     )
     .await
     .map_err(|e| e.into())
+}
+
+fn build_router(state: Arc<ApiContext>) -> Router {
+    Router::new()
+        .route("/", get(root))
+        .merge(api::router())
+        .with_state(state)
+        .layer(TraceLayer::new_for_http())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum_test::TestServer;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn root_test() {
+        let config = AppConfig {
+            log_level: "".to_string(),
+            auth: None,
+            ttp: Default::default(),
+        };
+        let state = Arc::new(ApiContext {
+            auth: None,
+            client: TtpClient::new(&config.ttp).await.unwrap(),
+        });
+
+        // test server
+        let router = build_router(state);
+        let server = TestServer::new(router).unwrap();
+
+        // send request
+        let response = server.get("/").await;
+
+        // assert
+        response.assert_status_ok();
+        response.assert_text("TTP ID Management API");
+    }
 }

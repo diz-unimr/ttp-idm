@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::error::ApiError;
 pub(crate) use crate::model::IdRequest;
 use crate::model::IdResponse;
@@ -10,13 +11,13 @@ use axum::{debug_handler, Json, Router};
 use fhir_model::r4b::resources::{ParametersParameter, Person};
 use reqwest::StatusCode;
 
-pub(crate) fn router() -> Router<ApiContext> {
+pub(crate) fn router() -> Router<Arc<ApiContext>> {
     Router::new().route("/api/pseudonyms", post(create))
 }
 
 #[debug_handler]
 pub(crate) async fn create(
-    State(ctx): State<ApiContext>,
+    State(ctx): State<Arc<ApiContext>>,
     Json(payload): Json<IdRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     // 1. create mpi in epix or return on conflict
