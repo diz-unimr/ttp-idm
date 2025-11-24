@@ -1,5 +1,8 @@
 use crate::api::IdRequest;
 use crate::config::{Epix, Gpas, Ttp};
+use crate::ttp::epix::soap::{
+    GetPossibleMatchesForPersonResponseEnvelope, GetPossibleMatchesForPersonResponseReturn,
+};
 use crate::ttp::{epix, gpas};
 use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
@@ -119,6 +122,43 @@ impl TtpClient {
 
         Ok(())
     }
+
+    pub(crate) async fn possible_matches_for_person(
+        &self,
+        mpi: String,
+    ) -> anyhow::Result<Vec<GetPossibleMatchesForPersonResponseReturn>> {
+        let body: String =
+            epix::create_possible_matches_for_person_request(self.epix.domain.name.clone(), mpi)
+                .try_into()?;
+
+        let request = self
+            .client
+            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+        let resp_body = response.text().await?;
+        let matched = GetPossibleMatchesForPersonResponseEnvelope::try_from(resp_body.as_str())?;
+
+        Ok(matched
+            .body
+            .get_possible_matches_for_person_response
+            .returns)
+    }
+
+    pub(crate) async fn merge_duplicate(
+        &self,
+        link_id: u32,
+    ) -> anyhow::Result<Vec<GetPossibleMatchesForPersonResponseReturn>> {
+        // <ser:removePossibleMatch>
+        // <possibleMatchId>102</possibleMatchId>
+        // </ser:removePossibleMatch>
+        todo!("implement")
+    }
 }
 
 impl TtpClient {
@@ -199,12 +239,6 @@ impl TtpClient {
                 ),
                 Some(
                     ParametersParameter::builder()
-                        .name("identity".to_string())
-                        .resource(idat.try_into()?)
-                        .build()?,
-                ),
-                Some(
-                    ParametersParameter::builder()
                         .name("saveAction".to_string())
                         .value(ParametersParameterValue::Coding(
                             Coding::builder()
@@ -212,9 +246,16 @@ impl TtpClient {
                                     "https://ths-greifswald.de/fhir/CodeSystem/epix/SaveAction"
                                         .to_string(),
                                 )
+                                // .code(idat.on_match.save_action().to_string())
                                 .code("DONT_SAVE_ON_PERFECT_MATCH_EXCEPT_CONTACTS".to_string())
                                 .build()?,
                         ))
+                        .build()?,
+                ),
+                Some(
+                    ParametersParameter::builder()
+                        .name("identity".to_string())
+                        .resource(idat.try_into()?)
                         .build()?,
                 ),
                 Some(
@@ -242,12 +283,12 @@ impl TtpClient {
         id_request: IdRequest,
     ) -> Result<(String, HashMap<String, Vec<String>>), anyhow::Error> {
         // create study domains
-        self.setup_gpas_domains(&id_request.study, &id_request.lab)
+        self.setup_gpas_domains(&id_request.trial, &id_request.lab)
             .await?;
 
         // pseudonymize mpi
         let mpi_psn = self
-            .pseudonymize_mpi(id_request.study.clone(), mpi.clone())
+            .pseudonymize_mpi(id_request.trial.clone(), mpi.clone())
             .await?;
 
         // pseudonymize lab ids with mpi value
@@ -256,7 +297,7 @@ impl TtpClient {
             if *count > 0 {
                 let ids = self
                     .pseudonymize_secondary(
-                        &id_request.study,
+                        &id_request.trial,
                         domain,
                         mpi.clone(),
                         count.to_string(),
@@ -373,6 +414,8 @@ impl TryFrom<String> for FaultEnvelope {
 pub(crate) mod tests {
     use crate::config::{AppConfig, Epix, Gpas, Ttp};
     use crate::ttp::client::TtpClient;
+    use httpmock::Method::POST;
+    use httpmock::MockServer;
     use reqwest::header::CONTENT_TYPE;
 
     fn init() {
@@ -453,5 +496,130 @@ pub(crate) mod tests {
 
         // assert client connection test failed
         assert!(test_result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_possible_matches_for_person_response() {
+        let test_response = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    <soap:Body>
+        <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
+            <return>
+                <creationType>AUTOMATIC</creationType>
+                <linkId>62</linkId>
+                <possibleMatchCreated>2025-11-21T14:16:23.242+01:00</possibleMatchCreated>
+                <priority>OPEN</priority>
+                <probability>3.1481482315455955</probability>
+                <assignedIdentity>
+                    <birthDate>1972-01-01T00:00:00+01:00</birthDate>
+                    <birthPlace>Musterstadt</birthPlace>
+                    <firstName>Max</firstName>
+                    <lastName>Muster</lastName>
+                    <deactivated>false</deactivated>
+                    <identityCreated>2025-11-21T14:16:23.242+01:00</identityCreated>
+                    <identityId>53</identityId>
+                    <identityLastEdited>2025-11-21T14:16:23.242+01:00</identityLastEdited>
+                    <identityVersion>1</identityVersion>
+                    <personId>53</personId>
+                    <source>
+                        <description>dummy because of the default-property "safe_source" in table domain</description>
+                        <entryDate>2025-11-19T23:11:27.909+01:00</entryDate>
+                        <label>dummy_safe_source</label>
+                        <name>dummy_safe_source</name>
+                        <updateDate>2025-11-19T23:11:27.909+01:00</updateDate>
+                    </source>
+                    <contacts>
+                        <city>Marburg</city>
+                        <zipCode>35037</zipCode>
+                        <contactCreated>2025-11-21T14:16:23.242+01:00</contactCreated>
+                        <contactId>53</contactId>
+                        <contactLastEdited>2025-11-21T14:16:23.242+01:00</contactLastEdited>
+                        <contactVersion>1</contactVersion>
+                        <deactivated>false</deactivated>
+                        <identityId>53</identityId>
+                    </contacts>
+                </assignedIdentity>
+                <matchingMPIIdentity>
+                    <identity>
+                        <birthDate>1972-01-01T00:00:00+01:00</birthDate>
+                        <birthPlace>Musterstadt</birthPlace>
+                        <firstName>Max</firstName>
+                        <lastName>Mustermann</lastName>
+                        <deactivated>false</deactivated>
+                        <identityCreated>2025-11-19T23:12:53.361+01:00</identityCreated>
+                        <identityId>1</identityId>
+                        <identityLastEdited>2025-11-19T23:12:53.361+01:00</identityLastEdited>
+                        <identityVersion>1</identityVersion>
+                        <personId>1</personId>
+                        <source>
+                            <description>dummy because of the default-property "safe_source" in table domain</description>
+                            <entryDate>2025-11-19T23:11:27.909+01:00</entryDate>
+                            <label>dummy_safe_source</label>
+                            <name>dummy_safe_source</name>
+                            <updateDate>2025-11-19T23:11:27.909+01:00</updateDate>
+                        </source>
+                        <contacts>
+                            <city>Marburg</city>
+                            <zipCode>35037</zipCode>
+                            <contactCreated>2025-11-19T23:12:53.361+01:00</contactCreated>
+                            <contactId>1</contactId>
+                            <contactLastEdited>2025-11-19T23:12:53.361+01:00</contactLastEdited>
+                            <contactVersion>1</contactVersion>
+                            <deactivated>false</deactivated>
+                            <identityId>1</identityId>
+                        </contacts>
+                    </identity>
+                    <mpiId>
+                        <description>generated MPI id</description>
+                        <entryDate>2025-11-19T23:12:53.361+01:00</entryDate>
+                        <fresh>false</fresh>
+                        <identifierDomain>
+                            <entryDate>2025-11-19T23:11:27.545+01:00</entryDate>
+                            <label>MPI</label>
+                            <name>MPI</name>
+                            <oid>1.2.276.0.76.3.1.132.1.1.1</oid>
+                            <updateDate>2025-11-19T23:11:27.545+01:00</updateDate>
+                        </identifierDomain>
+                        <value>1001000000011</value>
+                    </mpiId>
+                </matchingMPIIdentity>
+                <requestedMPI>
+                    <description>generated MPI id</description>
+                    <entryDate>2025-11-21T14:16:23.242+01:00</entryDate>
+                    <fresh>false</fresh>
+                    <identifierDomain>
+                        <entryDate>2025-11-19T23:11:27.545+01:00</entryDate>
+                        <label>MPI</label>
+                        <name>MPI</name>
+                        <oid>1.2.276.0.76.3.1.132.1.1.1</oid>
+                        <updateDate>2025-11-19T23:11:27.545+01:00</updateDate>
+                    </identifierDomain>
+                    <value>1001000000073</value>
+                </requestedMPI>
+            </return>
+        </ns2:getPossibleMatchesForPersonResponse>
+    </soap:Body>
+</soap:Envelope>"#;
+
+        let server = MockServer::start();
+        let epix_soap_mock = server.mock(|when, then| {
+            when.method(POST).path("/epix/epixService");
+            then.status(200).body(test_response);
+        });
+
+        let config = setup_config(server.base_url());
+        // create new client
+        let client = TtpClient::new(&config.ttp).await;
+
+        // connection test
+        let test_result = client
+            .unwrap()
+            .possible_matches_for_person("test".to_string())
+            .await;
+
+        // mocks were called once
+        epix_soap_mock.assert();
+
+        // assert client is created and initialized
+        assert!(test_result.is_ok());
     }
 }
