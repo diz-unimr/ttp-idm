@@ -1,13 +1,15 @@
 use crate::api::IdRequest;
 use crate::config::{Epix, Gpas, Ttp};
+use crate::error::ApiError;
 use crate::ttp::epix::model::{
-    GetPossibleMatchesForPersonResponseBody, GetPossibleMatchesForPersonResponseReturn,
-    SoapEnvelope,
+    GetPossibleMatchesForPersonResponseBody, PossibleMatchResult,
+    PossibleMatchesForDomainResponseBody, SoapEnvelope,
 };
 use crate::ttp::{epix, gpas};
 use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
 use fhir_model::r4b::types::Coding;
+use http::StatusCode;
 use log::{debug, error, info};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::{header, Client};
@@ -127,7 +129,7 @@ impl TtpClient {
     pub(crate) async fn possible_matches_for_person(
         &self,
         mpi: String,
-    ) -> anyhow::Result<Vec<GetPossibleMatchesForPersonResponseReturn>> {
+    ) -> anyhow::Result<Vec<PossibleMatchResult>> {
         let body: String =
             epix::possible_matches_for_person_request(self.epix.domain.name.clone(), mpi)
                 .try_into()?;
@@ -170,6 +172,65 @@ impl TtpClient {
             "E-PIX removePossibleMatchRequest failed for {}",
             link_id
         ))
+    }
+
+    pub(crate) async fn merge_identities(&self, link_id: u32) -> Result<(), ApiError> {
+        // fetch possible matches
+        let body: String =
+            epix::possible_matches_for_domain_request(self.epix.domain.name.clone()).try_into()?;
+        let request = self
+            .client
+            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+        let resp_body = response.text().await?;
+
+        let identities =
+            SoapEnvelope::<PossibleMatchesForDomainResponseBody>::try_from(resp_body.as_str())?
+                .body
+                .possible_matches_for_domain_response
+                .returns
+                .into_iter()
+                .find_map(|m| {
+                    if m.link_id == link_id {
+                        Some(m.matching_identities)
+                    } else {
+                        None
+                    }
+                })
+                .ok_or(ApiError(
+                    anyhow!("No match found with link_id: {}", link_id),
+                    StatusCode::NOT_FOUND,
+                ))?;
+
+        let winning_id = identities
+            .first()
+            .map(|i| i.identity.identity_id)
+            .ok_or(anyhow!("No identity found with link_id: {}", link_id))?;
+
+        let body: String = epix::assign_identity_request(link_id, winning_id).try_into()?;
+
+        let request = self
+            .client
+            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+
+        response
+            .status()
+            .is_success()
+            .then_some(())
+            .ok_or(anyhow!("E-PIX assignIdentityRequest failed for {}", link_id).into())
     }
 }
 

@@ -18,12 +18,12 @@ pub(crate) struct GetPossibleMatchesForPersonResponseBody {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct GetPossibleMatchesForPersonResponse {
     #[serde(rename = "return")]
-    pub(crate) returns: Vec<GetPossibleMatchesForPersonResponseReturn>,
+    pub(crate) returns: Vec<PossibleMatchResult>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GetPossibleMatchesForPersonResponseReturn {
+pub(crate) struct PossibleMatchResult {
     pub(crate) link_id: u32,
     pub(crate) priority: String,
     #[serde(rename = "matchingMPIIdentity")]
@@ -45,6 +45,7 @@ pub(crate) struct MpiIdentity {
     pub(crate) first_name: String,
     pub(crate) last_name: String,
     pub(crate) contacts: IdentityAddress,
+    pub(crate) identity_id: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -87,22 +88,34 @@ pub(super) struct SafeSource {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct GetPossibleMatchesForPersonBody {
+pub(crate) struct PossibleMatchesForPersonBody {
     #[serde(rename = "ser:getPossibleMatchesForPerson")]
-    pub(super) get_possible_matches_for_person: GetPossibleMatchesForPerson,
+    pub(super) get_possible_matches_for_person: PossibleMatchesForPerson,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct GetPossibleMatchesForPerson {
+pub(super) struct PossibleMatchesForPerson {
     pub(super) domain_name: String,
     pub(super) mpi_id: String,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct PossibleMatchesForDomainBody {
+    #[serde(rename = "ser:getPossibleMatchesForDomain")]
+    pub(crate) possible_matches_for_domain: PossibleMatchesForDomain,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PossibleMatchesForDomain {
+    pub(super) domain_name: String,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct AddIdentifierDomainBody {
     #[serde(rename = "ser:addIdentifierDomain")]
-    pub(crate) add_identifier_domain: AddIdentifierDomain,
+    pub(super) add_identifier_domain: AddIdentifierDomain,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -149,6 +162,40 @@ pub(super) struct RemovePossibleMatch {
     pub(super) possible_match_id: u32,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct AssignIdentityBody {
+    #[serde(rename = "ser:assignIdentity")]
+    pub(super) assign_identity: AssignIdentity,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AssignIdentity {
+    pub(super) possible_match_id: u32,
+    pub(crate) winning_identity_id: u32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct PossibleMatchesForDomainResponseBody {
+    #[serde(rename = "ns2:getPossibleMatchesForDomainResponse")]
+    pub(crate) possible_matches_for_domain_response: PossibleMatchesForDomainResponse,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct PossibleMatchesForDomainResponse {
+    #[serde(rename = "return")]
+    pub(crate) returns: Vec<PossibleMatchesForDomainResponseReturn>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PossibleMatchesForDomainResponseReturn {
+    pub(crate) link_id: u32,
+    pub(crate) priority: String,
+    #[serde(rename = "matchingMPIIdentities")]
+    pub(crate) matching_identities: Vec<MatchingIdentity>,
+}
+
 impl<T> SoapEnvelope<T> {
     pub(super) fn new(body: T) -> Self {
         SoapEnvelope::<T> { body }
@@ -159,8 +206,10 @@ impl<'a, T: Deserialize<'a>> TryFrom<&str> for SoapEnvelope<T> {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // todo: remove config?
         let config = serde_xml_rs::SerdeXml::new()
             .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
+            .namespace("ser", "http://service.epix.ttp.icmvc.emau.org/")
             .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
 
         let env: Self = config.from_str(value)?;

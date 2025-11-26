@@ -2,11 +2,11 @@ pub(crate) mod model;
 
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
-    AddIdentifierDomainBody, DataSource, Domain, GetPossibleMatchesForPerson,
-    GetPossibleMatchesForPersonBody, IdentifierDomain, MpiDomain, RemovePossibleMatch,
+    AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource, Domain,
+    IdentifierDomain, MpiDomain, PossibleMatchesForDomain, PossibleMatchesForDomainBody,
+    PossibleMatchesForPerson, PossibleMatchesForPersonBody, RemovePossibleMatch,
     RemovePossibleMatchBody, SafeSource, SoapEnvelope,
 };
-use serde_xml_rs::SerdeXml;
 use std::{env, fs};
 use uuid::Uuid;
 
@@ -66,20 +66,35 @@ pub(crate) fn remove_possible_match_request(
 pub(crate) fn possible_matches_for_person_request(
     domain: String,
     mpi: String,
-) -> SoapEnvelope<GetPossibleMatchesForPersonBody> {
-    SoapEnvelope::new(GetPossibleMatchesForPersonBody {
-        get_possible_matches_for_person: GetPossibleMatchesForPerson {
+) -> SoapEnvelope<PossibleMatchesForPersonBody> {
+    SoapEnvelope::new(PossibleMatchesForPersonBody {
+        get_possible_matches_for_person: PossibleMatchesForPerson {
             domain_name: domain,
             mpi_id: mpi,
         },
     })
 }
 
-fn serde_config() -> SerdeXml {
-    serde_xml_rs::SerdeXml::new()
-        .namespace("ser", "http://service.epix.ttp.icmvc.emau.org/")
-        .namespace("ns2", "http://service.epix.ttp.icmvc.emau.org/")
-        .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/")
+pub(crate) fn possible_matches_for_domain_request(
+    domain: String,
+) -> SoapEnvelope<PossibleMatchesForDomainBody> {
+    SoapEnvelope::new(PossibleMatchesForDomainBody {
+        possible_matches_for_domain: PossibleMatchesForDomain {
+            domain_name: domain,
+        },
+    })
+}
+
+pub(crate) fn assign_identity_request(
+    possible_match_id: u32,
+    winning_identity_id: u32,
+) -> SoapEnvelope<AssignIdentityBody> {
+    SoapEnvelope::new(AssignIdentityBody {
+        assign_identity: AssignIdentity {
+            possible_match_id,
+            winning_identity_id,
+        },
+    })
 }
 
 fn load_matching_config() -> Result<String, anyhow::Error> {
@@ -98,8 +113,7 @@ mod tests {
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
     use crate::ttp::epix::model::{
         GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
-        GetPossibleMatchesForPersonResponseReturn, IdentityAddress, MatchingIdentity, MpiIdentity,
-        SoapEnvelope,
+        IdentityAddress, MatchingIdentity, MpiIdentity, PossibleMatchResult, SoapEnvelope,
     };
     use chrono::NaiveDate;
 
@@ -240,7 +254,7 @@ mod tests {
 
         let matches = SoapEnvelope::new(GetPossibleMatchesForPersonResponseBody {
             get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse {
-                returns: vec![GetPossibleMatchesForPersonResponseReturn {
+                returns: vec![PossibleMatchResult {
                     link_id: 42,
                     priority: "OPEN".to_string(),
                     matching_identity: MatchingIdentity {
@@ -254,6 +268,7 @@ mod tests {
                                 zip_code: "35037".to_string(),
                                 city: "Marburg".to_string(),
                             },
+                            identity_id: 1,
                         },
                     },
                 }],

@@ -213,6 +213,7 @@ pub(crate) mod tests {
                 zip_code: "35037".to_string(),
                 city: "Marburg".to_string(),
             },
+            identity_id: 0,
         };
 
         let actual: Idat = identity.into();

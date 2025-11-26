@@ -26,15 +26,17 @@ pub(crate) async fn create(
     if let Some(link) = &payload.link
         && link.merge
     {
-        // merge duplicate
-        let _res = ctx.client.split_identities(link.id).await;
-        // todo get mpi etc.
+        if link.merge {
+            // merge duplicate
+            ctx.client.merge_identities(link.id).await?;
+        } else {
+            // keep separate identity
+            ctx.client.split_identities(link.id).await?;
+        }
     }
 
-    // 2. create mpi in epix or return on conflict
+    // 2. get/create mpi in epix or return on conflict
     let res = ctx.client.add_person(payload.clone()).await?;
-
-    log::debug!("{}", serde_json::to_string(&res)?);
 
     // 3. parse response
     match match_status(&res)? {
@@ -166,12 +168,4 @@ fn parse_mpi(params: Parameters) -> Result<String, anyhow::Error> {
         .ok_or(anyhow!(
             "Failed to parse MPI identifier from E-PIX response"
         ))
-}
-
-#[cfg(test)]
-pub(crate) mod tests {
-    #[test]
-    fn create_test() {
-        todo!("implement test")
-    }
 }
