@@ -1,7 +1,8 @@
 use crate::api::IdRequest;
 use crate::config::{Epix, Gpas, Ttp};
-use crate::ttp::epix::soap::{
-    GetPossibleMatchesForPersonResponseEnvelope, GetPossibleMatchesForPersonResponseReturn,
+use crate::ttp::epix::model::{
+    GetPossibleMatchesForPersonResponseBody, GetPossibleMatchesForPersonResponseReturn,
+    SoapEnvelope,
 };
 use crate::ttp::{epix, gpas};
 use anyhow::anyhow;
@@ -31,11 +32,11 @@ impl TtpClient {
 
     async fn setup_epix_domains(&self) -> anyhow::Result<()> {
         // create identifier domain
-        let soap = epix::create_id_domain_request(self.epix.identifier_domain.to_string());
+        let soap = epix::id_domain_request(self.epix.identifier_domain.to_string());
         self.create_epix_domain(soap.try_into()?).await?;
 
         // create data source
-        let soap = epix::create_data_source_request(self.epix.data_source.to_string());
+        let soap = epix::data_source_request(self.epix.data_source.to_string());
         self.create_epix_domain(soap.try_into()?).await?;
 
         // epix study domain
@@ -128,7 +129,7 @@ impl TtpClient {
         mpi: String,
     ) -> anyhow::Result<Vec<GetPossibleMatchesForPersonResponseReturn>> {
         let body: String =
-            epix::create_possible_matches_for_person_request(self.epix.domain.name.clone(), mpi)
+            epix::possible_matches_for_person_request(self.epix.domain.name.clone(), mpi)
                 .try_into()?;
 
         let request = self
@@ -142,7 +143,8 @@ impl TtpClient {
 
         let response = request.send().await?;
         let resp_body = response.text().await?;
-        let matched = GetPossibleMatchesForPersonResponseEnvelope::try_from(resp_body.as_str())?;
+        let matched =
+            SoapEnvelope::<GetPossibleMatchesForPersonResponseBody>::try_from(resp_body.as_str())?;
 
         Ok(matched
             .body
@@ -150,14 +152,24 @@ impl TtpClient {
             .returns)
     }
 
-    pub(crate) async fn merge_duplicate(
-        &self,
-        link_id: u32,
-    ) -> anyhow::Result<Vec<GetPossibleMatchesForPersonResponseReturn>> {
-        // <ser:removePossibleMatch>
-        // <possibleMatchId>102</possibleMatchId>
-        // </ser:removePossibleMatch>
-        todo!("implement")
+    pub(crate) async fn split_identities(&self, link_id: u32) -> anyhow::Result<()> {
+        let body: String = epix::remove_possible_match_request(link_id).try_into()?;
+
+        let request = self
+            .client
+            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+
+        response.status().is_success().then_some(()).ok_or(anyhow!(
+            "E-PIX removePossibleMatchRequest failed for {}",
+            link_id
+        ))
     }
 }
 

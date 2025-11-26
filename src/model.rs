@@ -1,4 +1,4 @@
-use crate::ttp::epix::soap::MpiIdentity;
+use crate::ttp::epix::model::MpiIdentity;
 use anyhow::anyhow;
 use chrono::{Datelike, NaiveDate};
 use fhir_model::r4b::codes::NameUse;
@@ -189,7 +189,7 @@ pub(crate) fn parse_date(date: NaiveDate) -> Result<time::Date, ComponentRange> 
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::model::Idat;
-    use crate::ttp::epix::soap::{IdentityAddress, MpiIdentity};
+    use crate::ttp::epix::model::{IdentityAddress, MpiIdentity};
     use chrono::NaiveDate;
 
     #[test]

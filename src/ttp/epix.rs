@@ -1,224 +1,78 @@
-pub(crate) mod soap;
+pub(crate) mod model;
 
-use crate::ttp::epix::soap::GetPossibleMatchesForPersonResponseEnvelope;
-use serde_derive::{Deserialize, Serialize};
+use crate::ttp::epix::model::{
+    AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
+    AddIdentifierDomainBody, DataSource, Domain, GetPossibleMatchesForPerson,
+    GetPossibleMatchesForPersonBody, IdentifierDomain, MpiDomain, RemovePossibleMatch,
+    RemovePossibleMatchBody, SafeSource, SoapEnvelope,
+};
 use serde_xml_rs::SerdeXml;
 use std::{env, fs};
 use uuid::Uuid;
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct AddDomainEnvelope {
-    #[serde(rename = "soap:Body")]
-    body: AddDomainBody,
-}
-
-#[derive(Serialize, Deserialize)]
-pub(crate) struct AddDomainBody {
-    #[serde(rename = "ser:addDomain")]
-    add_domain: AddDomain,
-}
-
-#[derive(Serialize, Deserialize)]
-pub(crate) struct AddDomain {
-    domain: Domain,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Domain {
-    name: String,
-    description: String,
-    label: String,
-    mpi_domain: MpiDomain,
-    safe_source: SafeSource,
-    config: String,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct MpiDomain {
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct SafeSource {
-    name: String,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct GetPossibleMatchesForPersonEnvelope {
-    #[serde(rename = "soap:Body")]
-    pub(crate) body: GetPossibleMatchesForPersonBody,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct GetPossibleMatchesForPersonBody {
-    #[serde(rename = "ser:getPossibleMatchesForPerson")]
-    pub(crate) get_possible_matches_for_person: GetPossibleMatchesForPerson,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GetPossibleMatchesForPerson {
-    pub(crate) domain_name: String,
-    pub(crate) mpi_id: String,
-}
-
-// todo: variable soap body
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct AddIdentifierDomainEnvelope {
-    #[serde(rename = "soap:Body")]
-    body: AddIdentifierDomainBody,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct AddIdentifierDomainBody {
-    #[serde(rename = "ser:addIdentifierDomain")]
-    add_identifier_domain: AddIdentifierDomain,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct AddIdentifierDomain {
-    identifier_domain: IdentifierDomain,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-struct IdentifierDomain {
-    name: String,
-    label: String,
-    oid: Uuid,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct AddDataSourceEnvelope {
-    #[serde(rename = "soap:Body")]
-    body: AddDataSourceBody,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct AddDataSourceBody {
-    #[serde(rename = "ser:addSource")]
-    add_source: AddDataSource,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct AddDataSource {
-    source: DataSource,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-struct DataSource {
-    name: String,
-    label: String,
-}
-
-impl TryInto<String> for AddDomainEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        Ok(serde_config().to_string(&self)?)
-    }
-}
-
-impl TryInto<String> for AddIdentifierDomainEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        Ok(serde_config().to_string(&self)?)
-    }
-}
-
-impl TryInto<String> for AddDataSourceEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        Ok(serde_config().to_string(&self)?)
-    }
-}
-
-impl TryInto<String> for GetPossibleMatchesForPersonEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        Ok(serde_config().to_string(&self)?)
-    }
-}
-
-impl TryInto<String> for GetPossibleMatchesForPersonResponseEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        Ok(serde_config().to_string(&self)?)
-    }
-}
 
 pub(crate) fn create_domain_request(
     domain: String,
     description: String,
     mpi_domain: String,
     safe_source: String,
-) -> Result<AddDomainEnvelope, anyhow::Error> {
-    Ok(AddDomainEnvelope {
-        body: AddDomainBody {
-            add_domain: AddDomain {
-                domain: Domain {
-                    name: domain.clone(),
-                    description,
-                    label: domain,
-                    mpi_domain: MpiDomain { name: mpi_domain },
-                    safe_source: SafeSource { name: safe_source },
-                    config: load_matching_config()?,
-                },
+) -> Result<SoapEnvelope<AddDomainBody>, anyhow::Error> {
+    Ok(SoapEnvelope::new(AddDomainBody {
+        add_domain: AddDomain {
+            domain: Domain {
+                name: domain.clone(),
+                description,
+                label: domain,
+                mpi_domain: MpiDomain { name: mpi_domain },
+                safe_source: SafeSource { name: safe_source },
+                config: load_matching_config()?,
+            },
+        },
+    }))
+}
+
+pub(crate) fn id_domain_request(domain: String) -> SoapEnvelope<AddIdentifierDomainBody> {
+    SoapEnvelope::new(AddIdentifierDomainBody {
+        add_identifier_domain: AddIdentifierDomain {
+            identifier_domain: IdentifierDomain {
+                name: domain.clone(),
+                label: domain,
+                oid: Uuid::new_v4(),
             },
         },
     })
 }
 
-pub(crate) fn create_id_domain_request(domain: String) -> AddIdentifierDomainEnvelope {
-    AddIdentifierDomainEnvelope {
-        body: AddIdentifierDomainBody {
-            add_identifier_domain: AddIdentifierDomain {
-                identifier_domain: IdentifierDomain {
-                    name: domain.clone(),
-                    label: domain,
-                    oid: Uuid::new_v4(),
-                },
+pub(crate) fn data_source_request(source: String) -> SoapEnvelope<AddDataSourceBody> {
+    SoapEnvelope::new(AddDataSourceBody {
+        add_source: AddDataSource {
+            source: DataSource {
+                name: source.clone(),
+                label: source,
             },
         },
-    }
+    })
 }
 
-pub(crate) fn create_data_source_request(source: String) -> AddDataSourceEnvelope {
-    AddDataSourceEnvelope {
-        body: AddDataSourceBody {
-            add_source: AddDataSource {
-                source: DataSource {
-                    name: source.clone(),
-                    label: source,
-                },
-            },
+pub(crate) fn remove_possible_match_request(
+    match_id: u32,
+) -> SoapEnvelope<RemovePossibleMatchBody> {
+    SoapEnvelope::new(RemovePossibleMatchBody {
+        remove_possible_match: RemovePossibleMatch {
+            possible_match_id: match_id,
         },
-    }
+    })
 }
 
-pub(crate) fn create_possible_matches_for_person_request(
+pub(crate) fn possible_matches_for_person_request(
     domain: String,
     mpi: String,
-) -> GetPossibleMatchesForPersonEnvelope {
-    GetPossibleMatchesForPersonEnvelope {
-        body: GetPossibleMatchesForPersonBody {
-            get_possible_matches_for_person: GetPossibleMatchesForPerson {
-                domain_name: domain,
-                mpi_id: mpi,
-            },
+) -> SoapEnvelope<GetPossibleMatchesForPersonBody> {
+    SoapEnvelope::new(GetPossibleMatchesForPersonBody {
+        get_possible_matches_for_person: GetPossibleMatchesForPerson {
+            domain_name: domain,
+            mpi_id: mpi,
         },
-    }
+    })
 }
 
 fn serde_config() -> SerdeXml {
@@ -242,10 +96,10 @@ fn load_matching_config() -> Result<String, anyhow::Error> {
 mod tests {
     use crate::ttp::client::FaultException::DuplicateEntryException;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
-    use crate::ttp::epix::soap::{
+    use crate::ttp::epix::model::{
         GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
-        GetPossibleMatchesForPersonResponseEnvelope, GetPossibleMatchesForPersonResponseReturn,
-        IdentityAddress, MatchingIdentity, MpiIdentity,
+        GetPossibleMatchesForPersonResponseReturn, IdentityAddress, MatchingIdentity, MpiIdentity,
+        SoapEnvelope,
     };
     use chrono::NaiveDate;
 
@@ -384,31 +238,29 @@ mod tests {
     </soap:Body>
 </soap:Envelope>"#;
 
-        let matches_body = GetPossibleMatchesForPersonResponseEnvelope {
-            body: GetPossibleMatchesForPersonResponseBody {
-                get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse {
-                    returns: vec![GetPossibleMatchesForPersonResponseReturn {
-                        link_id: 42,
-                        priority: "OPEN".to_string(),
-                        matching_identity: MatchingIdentity {
-                            identity: MpiIdentity {
-                                birth_date: NaiveDate::from_ymd_opt(1972, 1, 1).unwrap(),
-                                birth_place: "Berlin".to_string(),
-                                first_name: "Erika".to_string(),
-                                last_name: "Mustermann".to_string(),
-                                mothers_maiden_name: Some("Musterfrau".into()),
-                                contacts: IdentityAddress {
-                                    zip_code: "35037".to_string(),
-                                    city: "Marburg".to_string(),
-                                },
+        let matches = SoapEnvelope::new(GetPossibleMatchesForPersonResponseBody {
+            get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse {
+                returns: vec![GetPossibleMatchesForPersonResponseReturn {
+                    link_id: 42,
+                    priority: "OPEN".to_string(),
+                    matching_identity: MatchingIdentity {
+                        identity: MpiIdentity {
+                            birth_date: NaiveDate::from_ymd_opt(1972, 1, 1).unwrap(),
+                            birth_place: "Berlin".to_string(),
+                            first_name: "Erika".to_string(),
+                            last_name: "Mustermann".to_string(),
+                            mothers_maiden_name: Some("Musterfrau".into()),
+                            contacts: IdentityAddress {
+                                zip_code: "35037".to_string(),
+                                city: "Marburg".to_string(),
                             },
                         },
-                    }],
-                },
+                    },
+                }],
             },
-        };
+        });
 
-        let reverse = GetPossibleMatchesForPersonResponseEnvelope::try_from(soap).unwrap();
-        assert_eq!(matches_body, reverse);
+        let reverse = SoapEnvelope::try_from(soap).unwrap();
+        assert_eq!(matches, reverse);
     }
 }

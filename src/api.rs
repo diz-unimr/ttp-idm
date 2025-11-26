@@ -27,7 +27,7 @@ pub(crate) async fn create(
         && link.merge
     {
         // merge duplicate
-        let res = ctx.client.merge_duplicate(link.id);
+        let _res = ctx.client.split_identities(link.id).await;
         // todo get mpi etc.
     }
 
