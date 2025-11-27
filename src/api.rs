@@ -77,9 +77,9 @@ pub(crate) async fn create(
             let mpi = parse_mpi(res)?;
 
             // 5. create pseudonyms
-            let (patient_id, lab) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
+            let (participant, lab) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
 
-            Ok((StatusCode::OK, Json(IdResponse { patient_id, lab })).into_response())
+            Ok((StatusCode::OK, Json(IdResponse { participant, lab })).into_response())
         }
     }
 }

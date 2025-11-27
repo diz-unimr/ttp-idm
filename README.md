@@ -15,12 +15,13 @@ This service provides identity and pseudonym management with the Trusted third p
 An OpenApi spec is generated when building the service which can be obtained from `/api-docs/openapi.json` at runtime
 or via the SwaggerUI (`/swagger-ui`) endpoint.
 
-A copy of the current API doc is located
-at [/api-docs/openapi.json]. Inspect [Swagger](https://petstore.swagger.io/?url=/api-docs/openapi.json).
+A copy of the current API doc is located at [/api-docs/openapi.json](/api-docs/openapi.json).
+Inspect the API
+at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/diz-unimr/ttp-idm/refs/heads/separate-lab-domains/api-docs/openapi.json).
 
 ### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for patient)</code>
 
-Adds patient to E-PIX and generate pseudonyms and ids for the provided `study`.
+Adds patient to E-PIX and generate pseudonyms and ids for the provided `trial`.
 
 The property `lab_id_count` determines the number of secondary pseudonyms to be created.
 
@@ -36,15 +37,55 @@ The property `lab_id_count` determines the number of secondary pseudonyms to be 
 
 #### Responses
 
-> | http code                   | content-type               | response                                                             |
-> |-----------------------------|----------------------------|----------------------------------------------------------------------|
-> | `200` Ok                    | `application/json`         | [IdResponse](https://petstore.swagger.io/?url=api-docs/openapi.json) |
-> | `409` Conflict              | `application/json`         | `PromptResponse`                                                     |
-> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message                                                        |
+> | http code                   | content-type               | response                    |
+> |-----------------------------|----------------------------|-----------------------------|
+> | `200` Ok                    | `application/json`         | `IdResponse`                |
+> | `409` Conflict              | `application/json`         | `PromptResponse`            |
+> | `404` Not Found             | `application/json`         | No matching duplicate found |
+> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message               |
 
 ### Example
 
-todo
+#### Request
+
+```json
+{
+  "idat": {
+    "first_name": "Erika",
+    "last_name": "Mustermann",
+    "birth_name": "Musterfrau",
+    "birth_date": "1975-08-22",
+    "birth_place": "Musterstadt",
+    "postal_code": "35037",
+    "city": "Marburg"
+  },
+  "trial": "Studie",
+  "lab": {
+    "Labor 1": 2,
+    "Labor 2": 4
+  }
+}
+```
+
+#### Response
+
+```json
+{
+  "participant": "VYMGJ9TUMDHFPL14",
+  "lab": {
+    "Labor 2": [
+      "0LTKNJNZC5ZEWHG0",
+      "CXPEA1CP85JUKCVJ",
+      "MFXLKP5Y4PPTKUZV",
+      "3XPYZ932JCYAZ8TW"
+    ],
+    "Labor 1": [
+      "CCRPJTW1R8WU6W3P",
+      "1NFTHGWYNVYQEAPY"
+    ]
+  }
+}
+```
 
 ## Configuration properties
 
@@ -80,11 +121,9 @@ query:
     AUTH__BASIC__PASSWORD: test
     AUTH__BASIC__USERNAME: test
     TTP__EPIX__BASE_URL: http://localhost:8080
+    TTP__EPIX__DOMAIN__NAME: trial
     TTP__GPAS__BASE_URL: http://localhost:8081
-    TTP__RETRY__COUNT: 3
-    TTP__RETRY__TIMEOUT: 5
-    TTP__RETRY__WAIT: 2
-    TTP__RETRY__MAX_WAIT: 15
+    TTP__TIMEOUT: 60
 ```
 
 ## License

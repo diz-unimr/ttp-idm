@@ -9,21 +9,6 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::error::ComponentRange;
 
-#[derive(Deserialize, Clone)]
-pub(crate) enum OnMatch {
-    Prompt,
-    Save,
-}
-
-impl OnMatch {
-    pub(crate) fn save_action(&self) -> &str {
-        match self {
-            OnMatch::Prompt => "DONT_SAVE",
-            OnMatch::Save => "DONT_SAVE_ON_PERFECT_MATCH_EXCEPT_CONTACTS",
-        }
-    }
-}
-
 pub(crate) enum MatchStatus {
     NoMatch,
     PerfectMatch,
@@ -56,11 +41,11 @@ impl TryFrom<&str> for MatchStatus {
 
 #[derive(utoipa::ToSchema, Serialize)]
 pub(crate) struct IdResponse {
-    pub(crate) patient_id: String,
+    pub(crate) participant: String,
     pub(crate) lab: HashMap<String, Vec<String>>,
 }
 
-#[derive(utoipa::ToSchema, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(utoipa::ToSchema, Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub(crate) struct Idat {
     pub(crate) first_name: String,
     pub(crate) last_name: String,
@@ -86,13 +71,7 @@ pub(crate) struct Link {
 
 #[derive(utoipa::ToSchema, Deserialize, Clone)]
 pub(crate) struct IdRequest {
-    first_name: String,
-    last_name: String,
-    birth_date: NaiveDate,
-    birth_place: String,
-    birth_name: Option<String>,
-    postal_code: String,
-    city: String,
+    pub(crate) idat: Idat,
     pub(crate) trial: String,
     pub(crate) lab: HashMap<String, u32>,
     pub(crate) link: Option<Link>,
@@ -106,17 +85,18 @@ impl TryInto<Patient> for IdRequest {
         let mut names = vec![Some(
             HumanName::builder()
                 .given(
-                    self.first_name
+                    self.idat
+                        .first_name
                         .split(' ')
                         .map(|n| Some(n.to_string()))
                         .collect::<Vec<_>>(),
                 )
-                .family(self.last_name)
+                .family(self.idat.last_name)
                 .build()?,
         )];
 
         // (optional) birth name
-        if let Some(name) = self.birth_name {
+        if let Some(name) = self.idat.birth_name {
             names.push(Some(
                 HumanName::builder()
                     .r#use(NameUse::Maiden)
@@ -135,18 +115,18 @@ impl TryInto<Patient> for IdRequest {
                     .build()?,
             )
             .name(names)
-            .birth_date(Date::Date(parse_date(self.birth_date)?))
+            .birth_date(Date::Date(parse_date(self.idat.birth_date)?))
             .address(vec![Some(
                 Address::builder()
-                    .postal_code(self.postal_code)
-                    .city(self.city)
+                    .postal_code(self.idat.postal_code)
+                    .city(self.idat.city)
                     .build()?,
             )])
             .extension(vec![
                 Extension::builder()
                     .url("http://hl7.org/fhir/StructureDefinition/patient-birthPlace".to_string())
                     .value(ExtensionValue::Address(
-                        Address::builder().city(self.birth_place).build()?,
+                        Address::builder().city(self.idat.birth_place).build()?,
                     ))
                     .build()?,
             ]);
