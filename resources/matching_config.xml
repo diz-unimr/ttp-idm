@@ -149,7 +149,7 @@
     </preprocessing-config>
     <matching>
         <threshold-possible-match>2.99</threshold-possible-match>
-        <threshold-automatic-match>14.5</threshold-automatic-match>
+        <threshold-automatic-match>1001.0</threshold-automatic-match>
         <use-cemfim>false</use-cemfim>
         <parallel-matching-after>1000</parallel-matching-after>
         <number-of-threads-for-matching>22</number-of-threads-for-matching>
