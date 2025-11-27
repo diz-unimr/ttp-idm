@@ -1,5 +1,6 @@
 use crate::api;
 use crate::config::{AppConfig, Auth};
+use crate::model;
 use crate::ttp::client::TtpClient;
 use axum::routing::get;
 use axum::Router;
@@ -8,6 +9,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub(crate) struct ApiContext {
@@ -15,6 +18,15 @@ pub(crate) struct ApiContext {
     pub(crate) client: TtpClient,
 }
 
+/// API metadata
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "TTP ID Management Web API", body = str),
+    ),
+    tag = "metadata"
+)]
 async fn root() -> &'static str {
     "TTP ID Management API"
 }
@@ -54,11 +66,28 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
 
 fn build_router(state: Arc<ApiContext>) -> Router {
     Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(root))
         .merge(api::router())
         .with_state(state)
         .layer(TraceLayer::new_for_http())
 }
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        root,
+        api::create,
+    ),
+    components(schemas(
+        model::IdResponse,
+        model::Idat,
+        model::PromptResponse,
+        model::Link,
+    )),
+    tags((name = "pseudonymization"))
+)]
+struct ApiDoc;
 
 #[cfg(test)]
 mod tests {

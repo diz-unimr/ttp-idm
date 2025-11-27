@@ -18,6 +18,7 @@ pub(crate) fn router() -> Router<Arc<ApiContext>> {
 }
 
 #[debug_handler]
+#[utoipa::path(post, path = "/api/pseudonyms", responses((status = OK, body = IdResponse)))]
 pub(crate) async fn create(
     State(ctx): State<Arc<ApiContext>>,
     Json(payload): Json<IdRequest>,

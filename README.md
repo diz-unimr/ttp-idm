@@ -12,6 +12,12 @@ This service provides identity and pseudonym management with the Trusted third p
 
 ## API
 
+An OpenApi spec is generated when building the service which can be obtained from `/api-docs/openapi.json` at runtime
+or via the SwaggerUI (`/swagger-ui`) endpoint.
+
+A copy of the current API doc is located
+at [/api-docs/openapi.json]. Inspect [Swagger](https://petstore.swagger.io/?url=/api-docs/openapi.json).
+
 ### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for patient)</code>
 
 Adds patient to E-PIX and generate pseudonyms and ids for the provided `study`.
@@ -28,84 +34,17 @@ The property `lab_id_count` determines the number of secondary pseudonyms to be 
 > |--------------------|-------------|----------|
 > | `application/json` | `IdRequest` | true     |
 
-##### IdRequest (JSON Schema)
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "first_name": {
-      "type": "string"
-    },
-    "last_name": {
-      "type": "string"
-    },
-    "birth_date": {
-      "type": "string",
-      "format": "date"
-    },
-    "birth_place": {
-      "type": "string"
-    },
-    "birth_name": {
-      "type": "string"
-    },
-    "postal_code": {
-      "type": "string"
-    },
-    "city": {
-      "type": "string"
-    },
-    "study": {
-      "type": "string"
-    },
-    "lab_id_count": {
-      "type": "number"
-    }
-  },
-  "required": [
-    "first_name",
-    "last_name",
-    "birth_date",
-    "birth_place",
-    "postal_code",
-    "city",
-    "study",
-    "lab_id_count"
-  ]
-}
-```
-
 #### Responses
 
-> | http code                   | content-type               | response      |
-> |-----------------------------|----------------------------|---------------|
-> | `200` Ok                    | `application/json`         | `IdResponse`  |
-> | `201` Created               | `application/json`         | `IdResponse`  |
-> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message |
+> | http code                   | content-type               | response                                                             |
+> |-----------------------------|----------------------------|----------------------------------------------------------------------|
+> | `200` Ok                    | `application/json`         | [IdResponse](https://petstore.swagger.io/?url=api-docs/openapi.json) |
+> | `409` Conflict              | `application/json`         | `PromptResponse`                                                     |
+> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message                                                        |
 
-### IdResponse (JSON Schema)
+### Example
 
-```json
-{
-  "type": "object",
-  "properties": {
-    "patient_id": {
-      "type": "string"
-    },
-    "lab_ids": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    }
-  },
-  "required": [
-    "patient_id",
-    "lab_ids"
-  ]
-}
-```
+todo
 
 ## Configuration properties
 
@@ -117,10 +56,10 @@ Application properties are read from a properties file ([app.yaml](./app.yaml)) 
 | `auth.basic.username`         |                   | Basic auth username for this service    |          |
 | `auth.basic.password`         |                   | Basic auth password for this service    |          |
 | `ttp.epix.base_url`           |                   | E-PIX base url                          | ✓        |
-| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        | ✓        |
-| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            | ✓        |
-| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             | ✓        |
-| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    | ✓        |
+| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        |          |
+| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            |          |
+| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             |          |
+| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    |          |
 | `ttp.gpas.base_url`           |                   | gPAS base url                           | ✓        |
 | `ttp.timeout`                 | 120               | Retry timeout                           |          |
 

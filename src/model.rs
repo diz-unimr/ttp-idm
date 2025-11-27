@@ -54,13 +54,13 @@ impl TryFrom<&str> for MatchStatus {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(utoipa::ToSchema, Serialize)]
 pub(crate) struct IdResponse {
     pub(crate) patient_id: String,
     pub(crate) lab: HashMap<String, Vec<String>>,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(utoipa::ToSchema, Deserialize, Serialize, Debug, PartialEq)]
 pub(crate) struct Idat {
     pub(crate) first_name: String,
     pub(crate) last_name: String,
@@ -72,19 +72,19 @@ pub(crate) struct Idat {
     pub(crate) city: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(utoipa::ToSchema, Deserialize, Serialize)]
 pub(crate) struct PromptResponse {
     pub(crate) idat: Idat,
     pub(crate) link_id: u32,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(utoipa::ToSchema, Deserialize, Clone)]
 pub(crate) struct Link {
     pub(crate) id: u32,
     pub(crate) merge: bool,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(utoipa::ToSchema, Deserialize, Clone)]
 pub(crate) struct IdRequest {
     first_name: String,
     last_name: String,
