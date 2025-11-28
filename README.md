@@ -23,7 +23,10 @@ at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.c
 
 Adds patient to E-PIX and generate pseudonyms and ids for the provided `trial`.
 
-The property `lab_id_count` determines the number of secondary pseudonyms to be created.
+The `lab` property determines the number of pseudonyms to be created for each individual laboratory by name.
+
+> [!NOTE]
+> Property _keys_ for these are dynamic.
 
 #### Parameters
 
