@@ -184,7 +184,7 @@ pub(crate) struct PossibleMatchesForDomainResponseBody {
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct PossibleMatchesForDomainResponse {
     #[serde(rename = "return")]
-    pub(crate) returns: Vec<PossibleMatchesForDomainResponseReturn>,
+    pub(crate) returns: Option<Vec<PossibleMatchesForDomainResponseReturn>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -206,13 +206,7 @@ impl<'a, T: Deserialize<'a>> TryFrom<&str> for SoapEnvelope<T> {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        // todo: remove config?
-        let config = serde_xml_rs::SerdeXml::new()
-            .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
-            .namespace("ser", "http://service.epix.ttp.icmvc.emau.org/")
-            .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
-
-        let env: Self = config.from_str(value)?;
+        let env: Self = serde_xml_rs::from_str(value)?;
         Ok(env)
     }
 }

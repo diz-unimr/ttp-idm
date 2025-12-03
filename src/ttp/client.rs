@@ -10,7 +10,7 @@ use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
 use fhir_model::r4b::types::Coding;
 use http::StatusCode;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::{header, Client};
 use serde_derive::{Deserialize, Serialize};
@@ -167,11 +167,22 @@ impl TtpClient {
             .body(body);
 
         let response = request.send().await?;
+        let status = response.status();
+        let bla = response.text().await?;
 
-        response.status().is_success().then_some(()).ok_or(anyhow!(
-            "E-PIX removePossibleMatchRequest failed for {}",
-            link_id
-        ))
+        if !status.is_success() {
+            let blubb = FaultEnvelope::try_from(bla);
+            return Err(anyhow!(
+                blubb
+                    .map(|f: FaultEnvelope| f.body.fault.faultstring)
+                    .map_err(|e| {
+                        warn!("E-PIX removePossibleMatch with id: {link_id} failed. {e}");
+                        anyhow!("Failed to resolve possible E-PIX match with link id: {link_id}")
+                    })?
+            ));
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn merge_identities(&self, link_id: u32) -> Result<(), ApiError> {
@@ -195,13 +206,14 @@ impl TtpClient {
                 .body
                 .possible_matches_for_domain_response
                 .returns
-                .into_iter()
-                .find_map(|m| {
-                    if m.link_id == link_id {
-                        Some(m.matching_identities)
-                    } else {
-                        None
-                    }
+                .and_then(|r| {
+                    r.into_iter().find_map(|m| {
+                        if m.link_id == link_id {
+                            Some(m.matching_identities)
+                        } else {
+                            None
+                        }
+                    })
                 })
                 .ok_or(ApiError(
                     anyhow!("No match found with link_id: {}", link_id),
@@ -209,7 +221,7 @@ impl TtpClient {
                 ))?;
 
         let winning_id = identities
-            .first()
+            .last()
             .map(|i| i.identity.identity_id)
             .ok_or(anyhow!("No identity found with link_id: {}", link_id))?;
 
@@ -462,11 +474,20 @@ pub(crate) struct Fault {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InvalidParameterException {
+    parameter_name: String,
+    error_code: (),
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) enum FaultException {
     #[serde(rename = "ns1:DomainInUseException")]
-    DomainInUseException(()),
+    DomainInUse(()),
     #[serde(rename = "ns1:DuplicateEntryException")]
-    DuplicateEntryException(()),
+    DuplicateEntry(()),
+    #[serde(rename = "ns1:InvalidParameterException")]
+    InvalidParameter(InvalidParameterException),
 }
 
 impl TryFrom<String> for FaultEnvelope {

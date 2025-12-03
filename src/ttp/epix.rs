@@ -109,7 +109,7 @@ fn load_matching_config() -> Result<String, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ttp::client::FaultException::DuplicateEntryException;
+    use crate::ttp::client::FaultException::DuplicateEntry;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
     use crate::ttp::epix::model::{
         GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
@@ -141,7 +141,7 @@ mod tests {
                     fault: Fault {
                         faultcode: "soap:Server".to_string(),
                         faultstring: "identifier domain already exists: Test".to_string(),
-                        detail: DuplicateEntryException(())
+                        detail: DuplicateEntry(())
                     },
                 }
             }

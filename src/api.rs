@@ -24,9 +24,7 @@ pub(crate) async fn create(
     Json(payload): Json<IdRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     // 1. check request for merge 'flag'
-    if let Some(link) = &payload.link
-        && link.merge
-    {
+    if let Some(link) = &payload.link {
         if link.merge {
             // merge duplicate
             ctx.client.merge_identities(link.id).await?;
