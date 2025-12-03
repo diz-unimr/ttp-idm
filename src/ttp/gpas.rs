@@ -223,7 +223,7 @@ pub(crate) fn parse_secondary(params: Parameters) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ttp::client::FaultException::DomainInUseException;
+    use crate::ttp::client::FaultException::DomainInUse;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
     use crate::ttp::gpas::create_domain_request;
 
@@ -296,7 +296,7 @@ mod tests {
                     fault: Fault {
                         faultcode: "soap:Server".to_string(),
                         faultstring: "domain test already exists".to_string(),
-                        detail: DomainInUseException(())
+                        detail: DomainInUse(())
                     },
                 }
             }
