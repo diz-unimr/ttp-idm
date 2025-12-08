@@ -1,8 +1,4 @@
 log_level: info
-auth:
-  basic:
-    username:
-    password:
 ttp:
   epix:
     base_url:

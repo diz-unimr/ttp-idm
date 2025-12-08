@@ -2,10 +2,11 @@ use crate::error::ApiError;
 pub(crate) use crate::model::IdRequest;
 use crate::model::{IdResponse, Idat, MatchStatus, PromptResponse};
 use crate::server::ApiContext;
+use crate::ttp::client::TtpClient;
 use anyhow::anyhow;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::response::IntoResponse;
-use axum::routing::post;
+use axum::routing::{get, post};
 use axum::{debug_handler, Json, Router};
 use fhir_model::r4b::resources::{
     Parameters, ParametersParameter, ParametersParameterValue, Person,
@@ -14,7 +15,9 @@ use reqwest::StatusCode;
 use std::sync::Arc;
 
 pub(crate) fn router() -> Router<Arc<ApiContext>> {
-    Router::new().route("/api/pseudonyms", post(create))
+    Router::new()
+        .route("/api/pseudonyms/{trial}/{psn}", get(read))
+        .route("/api/pseudonyms", post(create))
 }
 
 #[debug_handler]
@@ -82,9 +85,32 @@ pub(crate) async fn create(
     }
 }
 
+#[debug_handler]
+#[utoipa::path(get, path = "/api/pseudonyms", responses((status = OK, body = IdResponse)))]
+pub(crate) async fn read(
+    State(ctx): State<Arc<ApiContext>>,
+    Path((trial, psn)): Path<(String, String)>,
+) -> Result<impl IntoResponse, ApiError> {
+    // get mpi
+    let mpi = ctx.client.identify(trial.clone(), psn).await?;
+
+    // get domains
+    let domains = ctx.client.get_secondary_domains(trial.clone()).await?;
+
+    // get pseudonyms
+    let client: Arc<TtpClient> = Arc::new(ctx.client.clone());
+    let lab = client.get_pseudonyms(domains, mpi.clone()).await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(IdResponse {
+            participant: mpi,
+            lab,
+        }),
+    ))
+}
+
 fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
-    // check matchStatus
-    // return 409 conflict on match?
     let match_code: anyhow::Result<&str> = params
         .parameter
         .iter()

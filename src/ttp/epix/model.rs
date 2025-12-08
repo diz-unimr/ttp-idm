@@ -3,15 +3,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct SoapEnvelope<T> {
-    #[serde(rename = "soap:Body")]
-    pub(crate) body: T,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct GetPossibleMatchesForPersonResponseBody {
-    #[serde(rename = "ns2:getPossibleMatchesForPersonResponse")]
+    #[serde(rename = "ns1:getPossibleMatchesForPersonResponse")]
     pub(crate) get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse,
 }
 
@@ -57,7 +50,7 @@ pub(crate) struct IdentityAddress {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub(crate) struct AddDomainBody {
-    #[serde(rename = "ser:addDomain")]
+    #[serde(rename = "ns1:addDomain")]
     pub(super) add_domain: AddDomain,
 }
 
@@ -89,7 +82,7 @@ pub(super) struct SafeSource {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct PossibleMatchesForPersonBody {
-    #[serde(rename = "ser:getPossibleMatchesForPerson")]
+    #[serde(rename = "ns1:getPossibleMatchesForPerson")]
     pub(super) get_possible_matches_for_person: PossibleMatchesForPerson,
 }
 
@@ -102,7 +95,7 @@ pub(super) struct PossibleMatchesForPerson {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct PossibleMatchesForDomainBody {
-    #[serde(rename = "ser:getPossibleMatchesForDomain")]
+    #[serde(rename = "ns1:getPossibleMatchesForDomain")]
     pub(crate) possible_matches_for_domain: PossibleMatchesForDomain,
 }
 
@@ -114,7 +107,7 @@ pub(crate) struct PossibleMatchesForDomain {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct AddIdentifierDomainBody {
-    #[serde(rename = "ser:addIdentifierDomain")]
+    #[serde(rename = "ns1:addIdentifierDomain")]
     pub(super) add_identifier_domain: AddIdentifierDomain,
 }
 
@@ -134,7 +127,7 @@ pub(super) struct IdentifierDomain {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct AddDataSourceBody {
-    #[serde(rename = "ser:addSource")]
+    #[serde(rename = "ns1:addSource")]
     pub(super) add_source: AddDataSource,
 }
 
@@ -152,7 +145,7 @@ pub(super) struct DataSource {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct RemovePossibleMatchBody {
-    #[serde(rename = "ser:removePossibleMatch")]
+    #[serde(rename = "ns1:removePossibleMatch")]
     pub(super) remove_possible_match: RemovePossibleMatch,
 }
 
@@ -164,7 +157,7 @@ pub(super) struct RemovePossibleMatch {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct AssignIdentityBody {
-    #[serde(rename = "ser:assignIdentity")]
+    #[serde(rename = "ns1:assignIdentity")]
     pub(super) assign_identity: AssignIdentity,
 }
 
@@ -177,7 +170,7 @@ pub(super) struct AssignIdentity {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct PossibleMatchesForDomainResponseBody {
-    #[serde(rename = "ns2:getPossibleMatchesForDomainResponse")]
+    #[serde(rename = "ns1:getPossibleMatchesForDomainResponse")]
     pub(crate) possible_matches_for_domain_response: PossibleMatchesForDomainResponse,
 }
 
@@ -194,35 +187,6 @@ pub(crate) struct PossibleMatchesForDomainResponseReturn {
     pub(crate) priority: String,
     #[serde(rename = "matchingMPIIdentities")]
     pub(crate) matching_identities: Vec<MatchingIdentity>,
-}
-
-impl<T> SoapEnvelope<T> {
-    pub(super) fn new(body: T) -> Self {
-        SoapEnvelope::<T> { body }
-    }
-}
-
-impl<'a, T: Deserialize<'a>> TryFrom<&str> for SoapEnvelope<T> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let env: Self = serde_xml_rs::from_str(value)?;
-        Ok(env)
-    }
-}
-
-impl<T: Serialize> TryInto<String> for SoapEnvelope<T> {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        let config = serde_xml_rs::SerdeXml::new()
-            .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
-            .namespace("ser", "http://service.epix.ttp.icmvc.emau.org/")
-            .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
-
-        let env: String = config.to_string(&self)?;
-        Ok(env)
-    }
 }
 
 mod naive_date_format {

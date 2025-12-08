@@ -1,5 +1,5 @@
 use crate::api;
-use crate::config::{AppConfig, Auth};
+use crate::config::AppConfig;
 use crate::model;
 use crate::ttp::client::TtpClient;
 use axum::routing::get;
@@ -14,7 +14,6 @@ use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Clone)]
 pub(crate) struct ApiContext {
-    pub(crate) auth: Option<Auth>,
     pub(crate) client: TtpClient,
 }
 
@@ -47,10 +46,7 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     client.setup_domains().await?;
 
     // context
-    let state = Arc::new(ApiContext {
-        auth: config.auth.clone(),
-        client,
-    });
+    let state = Arc::new(ApiContext { client });
 
     let router = build_router(state);
 
@@ -99,11 +95,9 @@ mod tests {
     async fn root_test() {
         let config = AppConfig {
             log_level: "".to_string(),
-            auth: None,
             ttp: Default::default(),
         };
         let state = Arc::new(ApiContext {
-            auth: None,
             client: TtpClient::new(&config.ttp).await.unwrap(),
         });
 
