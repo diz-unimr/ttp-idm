@@ -4,19 +4,7 @@ use serde_derive::Deserialize;
 #[derive(Default, Deserialize, Clone)]
 pub(crate) struct AppConfig {
     pub(crate) log_level: String,
-    pub(crate) auth: Option<Auth>,
     pub(crate) ttp: Ttp,
-}
-
-#[derive(Default, Deserialize, Clone)]
-pub(crate) struct Auth {
-    pub(crate) basic: Option<BasicAuth>,
-}
-
-#[derive(Default, Deserialize, Clone)]
-pub(crate) struct BasicAuth {
-    pub(crate) username: String,
-    pub(crate) password: String,
 }
 
 #[derive(Default, Deserialize, Clone)]

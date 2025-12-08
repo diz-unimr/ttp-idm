@@ -1,11 +1,12 @@
 pub(crate) mod model;
 
+use crate::ttp::client::SoapEnvelope;
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
     AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource, Domain,
     IdentifierDomain, MpiDomain, PossibleMatchesForDomain, PossibleMatchesForDomainBody,
     PossibleMatchesForPerson, PossibleMatchesForPersonBody, RemovePossibleMatch,
-    RemovePossibleMatchBody, SafeSource, SoapEnvelope,
+    RemovePossibleMatchBody, SafeSource,
 };
 use std::{env, fs};
 use uuid::Uuid;
@@ -110,10 +111,10 @@ fn load_matching_config() -> Result<String, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use crate::ttp::client::FaultException::DuplicateEntry;
-    use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
+    use crate::ttp::client::{Fault, FaultBody, FaultEnvelope, SoapEnvelope};
     use crate::ttp::epix::model::{
         GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
-        IdentityAddress, MatchingIdentity, MpiIdentity, PossibleMatchResult, SoapEnvelope,
+        IdentityAddress, MatchingIdentity, MpiIdentity, PossibleMatchResult,
     };
     use chrono::NaiveDate;
 
@@ -152,7 +153,7 @@ mod tests {
     async fn test_get_possible_matches_for_person_response() {
         let soap = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
+        <ns1:getPossibleMatchesForPersonResponse xmlns:ns1="http://service.epix.ttp.icmvc.emau.org/">
             <return>
                 <creationType>OPEN</creationType>
                 <linkId>42</linkId>
@@ -248,7 +249,7 @@ mod tests {
                     <value>1001000000002</value>
                 </requestedMPI>
             </return>
-        </ns2:getPossibleMatchesForPersonResponse>
+        </ns1:getPossibleMatchesForPersonResponse>
     </soap:Body>
 </soap:Envelope>"#;
 

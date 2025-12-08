@@ -1,79 +1,13 @@
+pub(crate) mod model;
+
+use crate::ttp::client::SoapEnvelope;
+pub(crate) use crate::ttp::gpas::model::{
+    AddDomain, AddDomainBody, AddDomainEnvelope, Domain, DomainConfig, GetDomain, GetDomainBody,
+    GetPseudonymsFor, GetPseudonymsForBody, PsnOperation,
+};
 use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
 use fhir_model::BuilderError;
-use serde_derive::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct AddDomainEnvelope {
-    #[serde(rename = "soap:Body")]
-    body: AddDomainBody,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct AddDomainBody {
-    #[serde(rename = "psn:addDomain")]
-    add_domain: AddDomain,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-struct AddDomain {
-    #[serde(rename = "domainDTO")]
-    domain: Domain,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-struct Domain {
-    name: String,
-    label: Option<String>,
-    check_digit_class: String,
-    alphabet: String,
-    parent_domain_names: Option<String>,
-    config: DomainConfig,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-struct DomainConfig {
-    psn_length: i32,
-    psn_prefix: Option<String>,
-    psns_deletable: bool,
-    multi_psn_domain: bool,
-    send_notifications_web: bool,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename = "soap:Envelope")]
-pub(crate) struct GetPseudonymsForEnvelope {
-    #[serde(rename = "soap:Body")]
-    body: GetPseudonymsForBody,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct GetPseudonymsForBody {
-    #[serde(rename = "psn:getPseudonymsFor")]
-    get_pseudonyms_for: GetPseudonymsFor,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-struct GetPseudonymsFor {
-    value: String,
-    domain_name: String,
-}
-
-impl TryInto<String> for AddDomainEnvelope {
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<String, Self::Error> {
-        let config = serde_xml_rs::SerdeXml::new()
-            .namespace("psn", "http://psn.ttp.ganimed.icmvc.emau.org/")
-            .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
-
-        Ok(config.to_string(&self)?)
-    }
-}
 
 pub(crate) fn create_domain_request(
     domain: String,
@@ -92,6 +26,7 @@ pub(crate) fn create_domain_request(
                         .into(),
                     alphabet: "org.emau.icmvc.ganimed.ttp.psn.alphabets.Symbol32".into(),
                     parent_domain_names: parent_domain,
+                    child_domain_names: None,
                     config: DomainConfig {
                         psn_length: 16,
                         psn_prefix: prefix,
@@ -105,9 +40,16 @@ pub(crate) fn create_domain_request(
     }
 }
 
+pub(crate) fn create_get_domain_request(trial: String) -> SoapEnvelope<GetDomainBody> {
+    SoapEnvelope::new(GetDomainBody {
+        get_domain: GetDomain { domain_name: trial },
+    })
+}
+
 pub(crate) fn create_psn_request(
     domain: String,
     value: String,
+    op: PsnOperation,
 ) -> Result<Parameters, BuilderError> {
     Parameters::builder()
         .parameter(vec![
@@ -119,7 +61,7 @@ pub(crate) fn create_psn_request(
             ),
             Some(
                 ParametersParameter::builder()
-                    .name("original".to_string())
+                    .name(op.into())
                     .value(ParametersParameterValue::String(value))
                     .build()?,
             ),
@@ -127,15 +69,16 @@ pub(crate) fn create_psn_request(
         .build()
 }
 
-pub(crate) fn get_secondary_psn_request(domain: String, value: String) -> GetPseudonymsForEnvelope {
-    GetPseudonymsForEnvelope {
-        body: GetPseudonymsForBody {
-            get_pseudonyms_for: GetPseudonymsFor {
-                value,
-                domain_name: domain,
-            },
+pub(crate) fn get_secondary_psn_request(
+    domain: String,
+    value: String,
+) -> SoapEnvelope<GetPseudonymsForBody> {
+    SoapEnvelope::new(GetPseudonymsForBody {
+        get_pseudonyms_for: GetPseudonymsFor {
+            value,
+            domain_name: domain,
         },
-    }
+    })
 }
 
 pub(crate) fn create_secondary_psn_request(
@@ -172,13 +115,13 @@ pub(crate) fn create_secondary_psn_request(
         .build()
 }
 
-pub(crate) fn parse_pseudonym(params: Parameters) -> anyhow::Result<String> {
+pub(crate) fn parse_pseudonym(params: Parameters, target: &str) -> anyhow::Result<String> {
     params
         .parameter
         .iter()
         .flatten()
         .filter_map(|p| {
-            if p.name == "pseudonym" {
+            if p.name == target {
                 Some(p.part.iter().flatten())
             } else {
                 None
@@ -186,7 +129,7 @@ pub(crate) fn parse_pseudonym(params: Parameters) -> anyhow::Result<String> {
         })
         .flatten()
         .filter_map(|p| match p.name.as_str() {
-            "pseudonym" => Some(&p.value),
+            part if part == target => Some(&p.value),
             _ => None,
         })
         .filter_map(|p| match &p {
@@ -231,9 +174,9 @@ mod tests {
     fn add_domain_envelope_test() {
         let soap = r#"
         <?xml version="1.0" encoding="UTF-8"?>
-        <soap:Envelope xmlns:psn="http://psn.ttp.ganimed.icmvc.emau.org/" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Envelope xmlns:ns2="http://psn.ttp.ganimed.icmvc.emau.org/" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
             <soap:Body>
-                <psn:addDomain>
+                <ns2:addDomain>
                     <domainDTO>
                         <name>test</name>
                         <label>label</label>
@@ -248,7 +191,7 @@ mod tests {
                             <sendNotificationsWeb>true</sendNotificationsWeb>
                         </config>
                     </domainDTO>
-                 </psn:addDomain>
+                 </ns2:addDomain>
             </soap:Body>
         </soap:Envelope>"#.trim();
 

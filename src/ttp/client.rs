@@ -3,19 +3,23 @@ use crate::config::{Epix, Gpas, Ttp};
 use crate::error::ApiError;
 use crate::ttp::epix::model::{
     GetPossibleMatchesForPersonResponseBody, PossibleMatchResult,
-    PossibleMatchesForDomainResponseBody, SoapEnvelope,
+    PossibleMatchesForDomainResponseBody,
 };
+use crate::ttp::gpas::model::{GetDomainResponseBody, GetPseudonymsForResponseBody};
+use crate::ttp::gpas::PsnOperation;
 use crate::ttp::{epix, gpas};
 use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
 use fhir_model::r4b::types::Coding;
 use http::StatusCode;
 use log::{debug, error, info, warn};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{header, Client};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::task::JoinSet;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TtpClient {
@@ -168,12 +172,11 @@ impl TtpClient {
 
         let response = request.send().await?;
         let status = response.status();
-        let bla = response.text().await?;
 
         if !status.is_success() {
-            let blubb = FaultEnvelope::try_from(bla);
+            let fault = FaultEnvelope::try_from(response.text().await?);
             return Err(anyhow!(
-                blubb
+                fault
                     .map(|f: FaultEnvelope| f.body.fault.faultstring)
                     .map_err(|e| {
                         warn!("E-PIX removePossibleMatch with id: {link_id} failed. {e}");
@@ -396,7 +399,7 @@ impl TtpClient {
     }
 
     async fn pseudonymize_mpi(&self, study: String, mpi: String) -> anyhow::Result<String> {
-        let body = gpas::create_psn_request(study, mpi)?;
+        let body = gpas::create_psn_request(study, mpi, PsnOperation::Pseudonymize)?;
         let request = self
             .client
             .post(
@@ -410,17 +413,78 @@ impl TtpClient {
 
         let response = request.send().await?;
         let params = serde_json::from_str(response.text().await?.as_str())?;
-        gpas::parse_pseudonym(params)
+        gpas::parse_pseudonym(params, "pseudonym")
+    }
+
+    pub(crate) async fn identify(&self, domain: String, psn: String) -> anyhow::Result<String> {
+        let body = gpas::create_psn_request(domain, psn, PsnOperation::Identify)?;
+        let request = self
+            .client
+            .post(format!("{}/ttp-fhir/fhir/gpas/$dePseudonymize", self.gpas.base_url).as_str())
+            .body(serde_json::to_string(&body)?);
+
+        let response = request.send().await?;
+        let params = serde_json::from_str(response.text().await?.as_str())?;
+        gpas::parse_pseudonym(params, "original")
+    }
+
+    pub(crate) async fn get_pseudonyms(
+        self: Arc<Self>,
+        domains: Vec<String>,
+        mpi: String,
+    ) -> anyhow::Result<HashMap<String, Vec<String>>> {
+        let mut set = JoinSet::new();
+        domains.into_iter().for_each(|d| {
+            let bla = Arc::clone(&self);
+            let mpi = mpi.clone();
+            set.spawn(async move { bla.get_pseudonyms_for_domain(d, mpi).await });
+        });
+
+        let psns = set
+            .join_all()
+            .await
+            .into_iter()
+            .flatten()
+            .collect::<HashMap<String, Vec<String>>>();
+
+        Ok(psns)
+    }
+
+    async fn get_pseudonyms_for_domain(
+        &self,
+        domain: String,
+        value: String,
+    ) -> anyhow::Result<(String, Vec<String>)> {
+        // get trial domain
+        let body: String = gpas::get_secondary_psn_request(domain.clone(), value).try_into()?;
+        let request = self
+            .client
+            .post(format!("{}/gpas/gpasService?wsdl", self.gpas.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        let response = request.send().await?;
+        let resp_body = response.text().await?;
+        let pseudonyms =
+            SoapEnvelope::<GetPseudonymsForResponseBody>::try_from(resp_body.as_str())?;
+
+        Ok((
+            domain,
+            pseudonyms.body.get_pseudonyms_for_response.returns.psn,
+        ))
     }
 
     async fn pseudonymize_secondary(
         &self,
-        study: &str,
+        trial: &str,
         lab: &str,
         mpi: String,
         count: String,
     ) -> anyhow::Result<Vec<String>> {
-        let body = gpas::create_secondary_psn_request(format!("{study}_{lab}"), mpi, count)?;
+        let body = gpas::create_secondary_psn_request(format!("{trial}_{lab}"), mpi, count)?;
         let request = self
             .client
             .post(
@@ -437,20 +501,30 @@ impl TtpClient {
         let params = serde_json::from_str(body.as_str())?;
         Ok(gpas::parse_secondary(params))
     }
-}
 
-fn create_auth_header(user: &str, password: Option<&str>) -> HeaderValue {
-    let builder = Client::new()
-        .get("http://localhost")
-        .basic_auth(user, password);
+    pub(crate) async fn get_secondary_domains(&self, trial: String) -> anyhow::Result<Vec<String>> {
+        // get trial domain
+        let body: String = gpas::create_get_domain_request(trial).try_into()?;
+        let request = self
+            .client
+            .post(format!("{}/gpas/DomainService?wsdl", self.gpas.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
 
-    builder
-        .build()
-        .unwrap()
-        .headers()
-        .get(AUTHORIZATION)
-        .unwrap()
-        .clone()
+        let response = request.send().await?;
+        let resp_body = response.text().await?;
+        let matched = SoapEnvelope::<GetDomainResponseBody>::try_from(resp_body.as_str())?;
+
+        Ok(matched
+            .body
+            .get_domain_response
+            .domain
+            .child_domain_names
+            .unwrap_or_default())
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -495,11 +569,47 @@ impl TryFrom<String> for FaultEnvelope {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let config = serde_xml_rs::SerdeXml::new()
-            .namespace("ns1", "http://psn.ttp.ganimed.icmvc.emau.org/")
             .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
+            .namespace("ns2", "http://psn.ttp.ganimed.icmvc.emau.org/")
             .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
 
         let env: Self = config.from_str(value.as_str())?;
+        Ok(env)
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename = "soap:Envelope")]
+pub(crate) struct SoapEnvelope<T> {
+    #[serde(rename = "soap:Body")]
+    pub(crate) body: T,
+}
+
+impl<T> SoapEnvelope<T> {
+    pub(super) fn new(body: T) -> Self {
+        SoapEnvelope::<T> { body }
+    }
+}
+
+impl<'a, T: serde::Deserialize<'a>> TryFrom<&str> for SoapEnvelope<T> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let env: Self = serde_xml_rs::from_str(value)?;
+        Ok(env)
+    }
+}
+
+impl<T: serde::Serialize> TryInto<String> for SoapEnvelope<T> {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        let config = serde_xml_rs::SerdeXml::new()
+            .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
+            .namespace("ns2", "http://psn.ttp.ganimed.icmvc.emau.org/")
+            .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
+
+        let env: String = config.to_string(&self)?;
         Ok(env)
     }
 }
@@ -596,7 +706,7 @@ pub(crate) mod tests {
     async fn test_get_possible_matches_for_person_response() {
         let test_response = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
+        <ns1:getPossibleMatchesForPersonResponse xmlns:ns1="http://service.epix.ttp.icmvc.emau.org/">
             <return>
                 <creationType>AUTOMATIC</creationType>
                 <linkId>62</linkId>
@@ -690,7 +800,7 @@ pub(crate) mod tests {
                     <value>1001000000073</value>
                 </requestedMPI>
             </return>
-        </ns2:getPossibleMatchesForPersonResponse>
+        </ns1:getPossibleMatchesForPersonResponse>
     </soap:Body>
 </soap:Envelope>"#;
 
