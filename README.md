@@ -97,8 +97,6 @@ Application properties are read from a properties file ([app.yaml](./app.yaml)) 
 | Name                          | Default           | Description                             | Required |
 |-------------------------------|-------------------|-----------------------------------------|----------|
 | `log_level`                   | info              | Log level (error,warn,info,debug,trace) |          |
-| `auth.basic.username`         |                   | Basic auth username for this service    |          |
-| `auth.basic.password`         |                   | Basic auth password for this service    |          |
 | `ttp.epix.base_url`           |                   | E-PIX base url                          | ✓        |
 | `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        |          |
 | `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            |          |
@@ -121,8 +119,6 @@ query:
   image: ghcr.io/diz-unimr/ttp-idm:latest
   environment:
     LOG_LEVEL: debug
-    AUTH__BASIC__PASSWORD: test
-    AUTH__BASIC__USERNAME: test
     TTP__EPIX__BASE_URL: http://localhost:8080
     TTP__EPIX__DOMAIN__NAME: trial
     TTP__GPAS__BASE_URL: http://localhost:8081
