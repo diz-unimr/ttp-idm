@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct GetPossibleMatchesForPersonResponseBody {
-    #[serde(rename = "ns1:getPossibleMatchesForPersonResponse")]
+    #[serde(rename = "ns2:getPossibleMatchesForPersonResponse")]
     pub(crate) get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse,
 }
 
@@ -170,7 +170,7 @@ pub(super) struct AssignIdentity {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct PossibleMatchesForDomainResponseBody {
-    #[serde(rename = "ns1:getPossibleMatchesForDomainResponse")]
+    #[serde(rename = "ns2:getPossibleMatchesForDomainResponse")]
     pub(crate) possible_matches_for_domain_response: PossibleMatchesForDomainResponse,
 }
 
