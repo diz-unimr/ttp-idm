@@ -26,16 +26,16 @@ pub(crate) async fn create(
     State(ctx): State<Arc<ApiContext>>,
     Json(payload): Json<IdRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // 1. check request for merge 'flag'
-    if let Some(link) = &payload.link {
-        if link.merge {
-            // merge duplicate
-            ctx.client.merge_identities(link.id).await?;
-        } else {
-            // keep separate identity
-            ctx.client.split_identities(link.id).await?;
-        }
-    }
+    // // 1. check request for merge flag
+    // if let Some(link) = &payload.link {
+    //     if link.merge {
+    //         // merge duplicate
+    //         ctx.client.merge_identities(link.id).await?;
+    //     } else {
+    //         // keep separate identity
+    //         ctx.client.split_identities(link.id).await?;
+    //     }
+    // }
 
     // 2. get/create mpi in epix or return on conflict
     let res = ctx.client.add_person(payload.clone()).await?;
@@ -44,6 +44,7 @@ pub(crate) async fn create(
     match match_status(&res)? {
         MatchStatus::MatchError => Err(anyhow!("E-PIX addPerson failed with MatchError"))?,
         MatchStatus::MultipleMatch => {
+            log::error!("MultipleMatch");
             todo!("handle multiple matches")
         }
         MatchStatus::ExternalMatch => {
@@ -60,24 +61,50 @@ pub(crate) async fn create(
         }
         MatchStatus::PossibleMatch => {
             // get possible match via getPossibleMatchesForPerson
-            let mpi = parse_mpi(res)?;
-            let match_response = ctx.client.possible_matches_for_person(mpi).await?;
-            // which one if multiple?
+            let mut mpi = parse_mpi(res)?;
+            let match_response = ctx.client.possible_matches_for_person(mpi.clone()).await?;
+            // should only ever be two matches
             let match_response = match_response.first().ok_or(anyhow!("No match"))?;
 
-            // todo parse response
-            let link_id = match_response.link_id;
-            let idat: Idat = match_response.matching_identity.identity.clone().into();
-            let prompt_response = PromptResponse { idat, link_id };
+            let match_id = &match_response.matching_identity;
+            let assigned_id = &match_response.assigned_identity;
 
-            let resp = (StatusCode::CONFLICT, Json(prompt_response)).into_response();
-            Ok(resp)
+            // resolve match
+            if let Some(link) = &payload.link {
+                if link.merge {
+                    // merge duplicate
+                    ctx.client
+                        .merge_identities(match_response.link_id, link.id)
+                        .await?;
+                    mpi = match_id.mpi_id.value.clone();
+                } else {
+                    // keep separate identity
+                    ctx.client.split_identities(link.id).await?;
+                }
+
+                // create pseudonyms
+                let (participant, lab) = ctx.client.pseudonymize(mpi, payload).await?;
+
+                Ok((StatusCode::OK, Json(IdResponse { participant, lab })).into_response())
+            } else {
+                // or return conflicting match
+                let idat: Idat = match_response.matching_identity.identity.clone().into();
+                let prompt_response = PromptResponse {
+                    idat,
+                    link_id: match_id.identity.identity_id,
+                };
+
+                // delete newly created entity
+                ctx.client.delete_identity(assigned_id.identity_id).await?;
+
+                Ok((StatusCode::CONFLICT, Json(prompt_response)).into_response())
+            }
         }
         MatchStatus::NoMatch | MatchStatus::PerfectMatch => {
-            // 4. parse mpi from response
+            // parse mpi from response
             let mpi = parse_mpi(res)?;
 
-            // 5. create pseudonyms
+            // create pseudonyms
             let (participant, lab) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
 
             Ok((StatusCode::OK, Json(IdResponse { participant, lab })).into_response())

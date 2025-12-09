@@ -3,10 +3,10 @@ pub(crate) mod model;
 use crate::ttp::client::SoapEnvelope;
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
-    AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource, Domain,
-    IdentifierDomain, MpiDomain, PossibleMatchesForDomain, PossibleMatchesForDomainBody,
-    PossibleMatchesForPerson, PossibleMatchesForPersonBody, RemovePossibleMatch,
-    RemovePossibleMatchBody, SafeSource,
+    AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource,
+    DeactivateIdentityBody, DeleteIdentityBody, Domain, IdentifierDomain, Identity, MpiDomain,
+    PossibleMatchesForDomain, PossibleMatchesForDomainBody, PossibleMatchesForPerson,
+    PossibleMatchesForPersonBody, RemovePossibleMatch, RemovePossibleMatchBody, SafeSource,
 };
 use std::{env, fs};
 use uuid::Uuid;
@@ -76,6 +76,18 @@ pub(crate) fn possible_matches_for_person_request(
     })
 }
 
+pub(crate) fn deactivate_entity_request(identity_id: u32) -> SoapEnvelope<DeactivateIdentityBody> {
+    SoapEnvelope::new(DeactivateIdentityBody {
+        deactivate_identity: Identity { identity_id },
+    })
+}
+
+pub(crate) fn delete_entity_request(identity_id: u32) -> SoapEnvelope<DeleteIdentityBody> {
+    SoapEnvelope::new(DeleteIdentityBody {
+        delete_identity: Identity { identity_id },
+    })
+}
+
 pub(crate) fn possible_matches_for_domain_request(
     domain: String,
 ) -> SoapEnvelope<PossibleMatchesForDomainBody> {
@@ -113,8 +125,8 @@ mod tests {
     use crate::ttp::client::FaultException::DuplicateEntry;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope, SoapEnvelope};
     use crate::ttp::epix::model::{
-        GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
-        IdentityAddress, MatchingIdentity, MpiIdentity, PossibleMatchResult,
+        GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody, Identity,
+        IdentityAddress, MatchingIdentity, MpiId, MpiIdentity, PossibleMatchResult,
     };
     use chrono::NaiveDate;
 
@@ -271,7 +283,11 @@ mod tests {
                             },
                             identity_id: 1,
                         },
+                        mpi_id: MpiId {
+                            value: "".to_string(),
+                        },
                     },
+                    assigned_identity: Identity { identity_id: 0 },
                 }],
             },
         });

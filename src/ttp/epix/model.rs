@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct GetPossibleMatchesForPersonResponseBody {
-    #[serde(rename = "ns1:getPossibleMatchesForPersonResponse")]
+    #[serde(rename = "ns2:getPossibleMatchesForPersonResponse")]
     pub(crate) get_possible_matches_for_person_response: GetPossibleMatchesForPersonResponse,
 }
 
@@ -21,11 +21,19 @@ pub(crate) struct PossibleMatchResult {
     pub(crate) priority: String,
     #[serde(rename = "matchingMPIIdentity")]
     pub(crate) matching_identity: MatchingIdentity,
+    pub(crate) assigned_identity: Identity,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct MatchingIdentity {
     pub(crate) identity: MpiIdentity,
+    pub(crate) mpi_id: MpiId,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct MpiId {
+    pub(crate) value: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -168,25 +176,22 @@ pub(super) struct AssignIdentity {
     pub(crate) winning_identity_id: u32,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct PossibleMatchesForDomainResponseBody {
-    #[serde(rename = "ns1:getPossibleMatchesForDomainResponse")]
-    pub(crate) possible_matches_for_domain_response: PossibleMatchesForDomainResponse,
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct DeactivateIdentityBody {
+    #[serde(rename = "ns1:deactivateIdentity")]
+    pub(crate) deactivate_identity: Identity,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct PossibleMatchesForDomainResponse {
-    #[serde(rename = "return")]
-    pub(crate) returns: Option<Vec<PossibleMatchesForDomainResponseReturn>>,
+#[derive(Serialize, Deserialize, Debug)]
+pub(crate) struct DeleteIdentityBody {
+    #[serde(rename = "ns1:deleteIdentity")]
+    pub(crate) delete_identity: Identity,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PossibleMatchesForDomainResponseReturn {
-    pub(crate) link_id: u32,
-    pub(crate) priority: String,
-    #[serde(rename = "matchingMPIIdentities")]
-    pub(crate) matching_identities: Vec<MatchingIdentity>,
+pub(crate) struct Identity {
+    pub(crate) identity_id: u32,
 }
 
 mod naive_date_format {
