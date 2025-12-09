@@ -92,19 +92,19 @@ pub(crate) async fn read(
     Path((trial, psn)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, ApiError> {
     // get mpi
-    let mpi = ctx.client.identify(trial.clone(), psn).await?;
+    let mpi = ctx.client.identify(trial.clone(), psn.clone()).await?;
 
     // get domains
     let domains = ctx.client.get_secondary_domains(trial.clone()).await?;
 
     // get pseudonyms
     let client: Arc<TtpClient> = Arc::new(ctx.client.clone());
-    let lab = client.get_pseudonyms(domains, mpi.clone()).await?;
+    let lab = client.get_pseudonyms(domains, mpi).await?;
 
     Ok((
         StatusCode::OK,
         Json(IdResponse {
-            participant: mpi,
+            participant: psn,
             lab,
         }),
     ))
