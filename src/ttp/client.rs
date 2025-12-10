@@ -1,20 +1,15 @@
 use crate::api::IdRequest;
 use crate::config::{Epix, Gpas, Ttp};
-use crate::error::ApiError;
-use crate::ttp::epix::model::{
-    GetPossibleMatchesForPersonResponseBody, PossibleMatchResult,
-    PossibleMatchesForDomainResponseBody,
-};
+use crate::ttp::epix::model::{GetPossibleMatchesForPersonResponseBody, PossibleMatchResult};
 use crate::ttp::gpas::model::{GetDomainResponseBody, GetPseudonymsForResponseBody};
 use crate::ttp::gpas::PsnOperation;
 use crate::ttp::{epix, gpas};
 use anyhow::anyhow;
 use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
 use fhir_model::r4b::types::Coding;
-use http::StatusCode;
 use log::{debug, error, info, warn};
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::{header, Client};
+use reqwest::{header, Client, Error, Response};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -130,6 +125,44 @@ impl TtpClient {
         Ok(())
     }
 
+    pub(crate) async fn delete_identity(&self, identity_id: u32) -> anyhow::Result<()> {
+        // deactivate first
+        let body: String = epix::deactivate_entity_request(identity_id).try_into()?;
+        let response = self.send_epix(body).await?;
+
+        // todo: refactor check response
+        if !response.status().is_success() {
+            let resp_text = response.text().await?;
+            let fault = FaultEnvelope::try_from(resp_text.clone())
+                .map_err(|_| anyhow!("Failed to deactivate E-PIX identity: {}", resp_text))?;
+
+            return Err(anyhow!(
+                "Failed to deactivate E-PIX identity: {}",
+                fault.body.fault.faultstring
+            ));
+        }
+        debug!("E-PIX identity with id: {identity_id} successfully deactivated");
+
+        // delete identity
+        let body: String = epix::delete_entity_request(identity_id).try_into()?;
+        let response = self.send_epix(body).await?;
+        // todo check response
+        if !response.status().is_success() {
+            let resp_text = response.text().await?;
+            let fault = FaultEnvelope::try_from(resp_text.clone())
+                .map_err(|_| anyhow!("Failed to delete E-PIX identity: {}", resp_text))?;
+
+            return Err(anyhow!(
+                "Failed to delete E-PIX identity: {}",
+                fault.body.fault.faultstring
+            ));
+        }
+
+        debug!("E-PIX identity with id: {identity_id} successfully deleted");
+
+        Ok(())
+    }
+
     pub(crate) async fn possible_matches_for_person(
         &self,
         mpi: String,
@@ -188,68 +221,6 @@ impl TtpClient {
         Ok(())
     }
 
-    pub(crate) async fn merge_identities(&self, link_id: u32) -> Result<(), ApiError> {
-        // fetch possible matches
-        let body: String =
-            epix::possible_matches_for_domain_request(self.epix.domain.name.clone()).try_into()?;
-        let request = self
-            .client
-            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
-            .header(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/soap+xml"),
-            )
-            .body(body);
-
-        let response = request.send().await?;
-        let resp_body = response.text().await?;
-
-        let identities =
-            SoapEnvelope::<PossibleMatchesForDomainResponseBody>::try_from(resp_body.as_str())?
-                .body
-                .possible_matches_for_domain_response
-                .returns
-                .and_then(|r| {
-                    r.into_iter().find_map(|m| {
-                        if m.link_id == link_id {
-                            Some(m.matching_identities)
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .ok_or(ApiError(
-                    anyhow!("No match found with link_id: {}", link_id),
-                    StatusCode::NOT_FOUND,
-                ))?;
-
-        let winning_id = identities
-            .last()
-            .map(|i| i.identity.identity_id)
-            .ok_or(anyhow!("No identity found with link_id: {}", link_id))?;
-
-        let body: String = epix::assign_identity_request(link_id, winning_id).try_into()?;
-
-        let request = self
-            .client
-            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
-            .header(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/soap+xml"),
-            )
-            .body(body);
-
-        let response = request.send().await?;
-
-        response
-            .status()
-            .is_success()
-            .then_some(())
-            .ok_or(anyhow!("E-PIX assignIdentityRequest failed for {}", link_id).into())
-    }
-}
-
-impl TtpClient {
     pub(crate) async fn new(config: &Ttp) -> Result<Self, anyhow::Error> {
         // default headers
         let mut headers = HeaderMap::new();
@@ -525,7 +496,39 @@ impl TtpClient {
             .child_domain_names
             .unwrap_or_default())
     }
+
+    async fn send_epix(&self, body: String) -> Result<Response, Error> {
+        let request = self
+            .client
+            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/soap+xml"),
+            )
+            .body(body);
+
+        request.send().await
+    }
 }
+
+// async fn parse_response<'a, T: Deserialize>(response: Response) -> anyhow::Result<T>
+// where
+//     SoapEnvelope<T>: TryFrom<&'a str>, // where
+//                                        //     SoapEnvelope<T>: TryFrom<&'a str>,
+// {
+//     if !response.status().is_success() {
+//         let resp_text = response.text().await?;
+//         let fault = FaultEnvelope::try_from(resp_text);
+//         Err(anyhow!(
+//             fault.map(|f: FaultEnvelope| f.body.fault.faultstring)?
+//         ))
+//     } else {
+//         let resp_text = response.text().await?.as_str();
+//         let soap: SoapEnvelope<T> = SoapEnvelope::<T>::try_from(resp_text)?;
+//
+//         Ok(soap.body)
+//     }
+// }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename = "soap:Envelope")]
@@ -607,6 +610,7 @@ impl<T: serde::Serialize> TryInto<String> for SoapEnvelope<T> {
         let config = serde_xml_rs::SerdeXml::new()
             .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
             .namespace("ns2", "http://psn.ttp.ganimed.icmvc.emau.org/")
+            .namespace("ns2", "http://service.epix.ttp.icmvc.emau.org/")
             .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
 
         let env: String = config.to_string(&self)?;
@@ -814,7 +818,7 @@ pub(crate) mod tests {
         // create new client
         let client = TtpClient::new(&config.ttp).await;
 
-        // connection test
+        // check duplicates
         let test_result = client
             .unwrap()
             .possible_matches_for_person("test".to_string())

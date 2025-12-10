@@ -59,6 +59,11 @@ pub(crate) struct Idat {
 
 #[derive(utoipa::ToSchema, Deserialize, Serialize)]
 pub(crate) struct PromptResponse {
+    pub(crate) matches: Vec<IdMatch>,
+}
+
+#[derive(utoipa::ToSchema, Deserialize, Serialize)]
+pub(crate) struct IdMatch {
     pub(crate) idat: Idat,
     pub(crate) link_id: u32,
 }
@@ -145,6 +150,15 @@ impl From<MpiIdentity> for Idat {
             birth_name: value.mothers_maiden_name,
             postal_code: value.contacts.zip_code,
             city: value.contacts.city,
+        }
+    }
+}
+
+impl From<MpiIdentity> for IdMatch {
+    fn from(value: MpiIdentity) -> Self {
+        IdMatch {
+            idat: value.clone().into(),
+            link_id: value.identity_id,
         }
     }
 }

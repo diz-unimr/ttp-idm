@@ -3,10 +3,9 @@ pub(crate) mod model;
 use crate::ttp::client::SoapEnvelope;
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
-    AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource, Domain,
-    IdentifierDomain, MpiDomain, PossibleMatchesForDomain, PossibleMatchesForDomainBody,
-    PossibleMatchesForPerson, PossibleMatchesForPersonBody, RemovePossibleMatch,
-    RemovePossibleMatchBody, SafeSource,
+    AddIdentifierDomainBody, DataSource, DeactivateIdentityBody, DeleteIdentityBody, Domain,
+    IdentifierDomain, Identity, MpiDomain, PossibleMatchesForPerson, PossibleMatchesForPersonBody,
+    RemovePossibleMatch, RemovePossibleMatchBody, SafeSource,
 };
 use std::{env, fs};
 use uuid::Uuid;
@@ -76,25 +75,15 @@ pub(crate) fn possible_matches_for_person_request(
     })
 }
 
-pub(crate) fn possible_matches_for_domain_request(
-    domain: String,
-) -> SoapEnvelope<PossibleMatchesForDomainBody> {
-    SoapEnvelope::new(PossibleMatchesForDomainBody {
-        possible_matches_for_domain: PossibleMatchesForDomain {
-            domain_name: domain,
-        },
+pub(crate) fn deactivate_entity_request(identity_id: u32) -> SoapEnvelope<DeactivateIdentityBody> {
+    SoapEnvelope::new(DeactivateIdentityBody {
+        deactivate_identity: Identity { identity_id },
     })
 }
 
-pub(crate) fn assign_identity_request(
-    possible_match_id: u32,
-    winning_identity_id: u32,
-) -> SoapEnvelope<AssignIdentityBody> {
-    SoapEnvelope::new(AssignIdentityBody {
-        assign_identity: AssignIdentity {
-            possible_match_id,
-            winning_identity_id,
-        },
+pub(crate) fn delete_entity_request(identity_id: u32) -> SoapEnvelope<DeleteIdentityBody> {
+    SoapEnvelope::new(DeleteIdentityBody {
+        delete_identity: Identity { identity_id },
     })
 }
 
@@ -113,8 +102,8 @@ mod tests {
     use crate::ttp::client::FaultException::DuplicateEntry;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope, SoapEnvelope};
     use crate::ttp::epix::model::{
-        GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody,
-        IdentityAddress, MatchingIdentity, MpiIdentity, PossibleMatchResult,
+        GetPossibleMatchesForPersonResponse, GetPossibleMatchesForPersonResponseBody, Identity,
+        IdentityAddress, MatchingIdentity, MpiId, MpiIdentity, PossibleMatchResult,
     };
     use chrono::NaiveDate;
 
@@ -150,7 +139,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_possible_matches_for_person_response() {
+    async fn test_get_matches_serde() {
         let soap = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
         <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
@@ -271,7 +260,11 @@ mod tests {
                             },
                             identity_id: 1,
                         },
+                        mpi_id: MpiId {
+                            value: "1001000000001".to_string(),
+                        },
                     },
+                    assigned_identity: Identity { identity_id: 2 },
                 }],
             },
         });
