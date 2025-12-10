@@ -143,7 +143,7 @@ mod tests {
     async fn test_get_possible_matches_for_person_response() {
         let soap = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <ns1:getPossibleMatchesForPersonResponse xmlns:ns1="http://service.epix.ttp.icmvc.emau.org/">
+        <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
             <return>
                 <creationType>OPEN</creationType>
                 <linkId>42</linkId>
@@ -239,7 +239,7 @@ mod tests {
                     <value>1001000000002</value>
                 </requestedMPI>
             </return>
-        </ns1:getPossibleMatchesForPersonResponse>
+        </ns2:getPossibleMatchesForPersonResponse>
     </soap:Body>
 </soap:Envelope>"#;
 
