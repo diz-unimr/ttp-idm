@@ -3,9 +3,9 @@ pub(crate) mod model;
 use crate::ttp::client::SoapEnvelope;
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
-    AddIdentifierDomainBody, AssignIdentity, AssignIdentityBody, DataSource,
-    DeactivateIdentityBody, DeleteIdentityBody, Domain, IdentifierDomain, Identity, MpiDomain,
-    PossibleMatchesForDomain, PossibleMatchesForDomainBody, PossibleMatchesForPerson,
+    AddIdentifierDomainBody, DataSource,
+    DeactivateIdentityBody, DeleteIdentityBody, Domain, IdentifierDomain, Identity, MpiDomain
+    , PossibleMatchesForPerson,
     PossibleMatchesForPersonBody, RemovePossibleMatch, RemovePossibleMatchBody, SafeSource,
 };
 use std::{env, fs};
@@ -85,28 +85,6 @@ pub(crate) fn deactivate_entity_request(identity_id: u32) -> SoapEnvelope<Deacti
 pub(crate) fn delete_entity_request(identity_id: u32) -> SoapEnvelope<DeleteIdentityBody> {
     SoapEnvelope::new(DeleteIdentityBody {
         delete_identity: Identity { identity_id },
-    })
-}
-
-pub(crate) fn possible_matches_for_domain_request(
-    domain: String,
-) -> SoapEnvelope<PossibleMatchesForDomainBody> {
-    SoapEnvelope::new(PossibleMatchesForDomainBody {
-        possible_matches_for_domain: PossibleMatchesForDomain {
-            domain_name: domain,
-        },
-    })
-}
-
-pub(crate) fn assign_identity_request(
-    possible_match_id: u32,
-    winning_identity_id: u32,
-) -> SoapEnvelope<AssignIdentityBody> {
-    SoapEnvelope::new(AssignIdentityBody {
-        assign_identity: AssignIdentity {
-            possible_match_id,
-            winning_identity_id,
-        },
     })
 }
 

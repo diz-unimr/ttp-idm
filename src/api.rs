@@ -1,6 +1,6 @@
 use crate::error::ApiError;
 pub(crate) use crate::model::IdRequest;
-use crate::model::{IdResponse, Idat, MatchStatus, PromptResponse};
+use crate::model::{IdMatch, IdResponse, MatchStatus, PromptResponse};
 use crate::server::ApiContext;
 use crate::ttp::client::TtpClient;
 use anyhow::anyhow;
@@ -9,7 +9,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{debug_handler, Json, Router};
 use fhir_model::r4b::resources::{
-    Parameters, ParametersParameter, ParametersParameterValue, Person,
+    Parameters, ParametersParameter, ParametersParameterValue, Patient, Person,
 };
 use reqwest::StatusCode;
 use std::sync::Arc;
@@ -26,21 +26,10 @@ pub(crate) async fn create(
     State(ctx): State<Arc<ApiContext>>,
     Json(payload): Json<IdRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    // // 1. check request for merge flag
-    // if let Some(link) = &payload.link {
-    //     if link.merge {
-    //         // merge duplicate
-    //         ctx.client.merge_identities(link.id).await?;
-    //     } else {
-    //         // keep separate identity
-    //         ctx.client.split_identities(link.id).await?;
-    //     }
-    // }
-
-    // 2. get/create mpi in epix or return on conflict
+    // get/create mpi in epix
     let res = ctx.client.add_person(payload.clone()).await?;
 
-    // 3. parse response
+    // parse response
     match match_status(&res)? {
         MatchStatus::MatchError => Err(anyhow!("E-PIX addPerson failed with MatchError"))?,
         MatchStatus::MultipleMatch => {
@@ -60,49 +49,59 @@ pub(crate) async fn create(
             todo!("handle these")
         }
         MatchStatus::PossibleMatch => {
-            // get possible match via getPossibleMatchesForPerson
-            let mut mpi = parse_mpi(res)?;
-            let match_response = ctx.client.possible_matches_for_person(mpi.clone()).await?;
-            // should only ever be two matches
-            let match_response = match_response.first().ok_or(anyhow!("No match"))?;
+            // get possible matches
+            let mut mpi = parse_mpi(&res)?;
+            let possible_matches = ctx.client.possible_matches_for_person(mpi.clone()).await?;
 
-            let match_id = &match_response.matching_identity;
-            let assigned_id = &match_response.assigned_identity;
+            // newly created identity_id
+            let identity_id = parse_identity_id(&res)?;
 
             // resolve match
             if let Some(link) = &payload.link {
                 if link.merge {
-                    // merge duplicate
-                    ctx.client
-                        .merge_identities(match_response.link_id, link.id)
-                        .await?;
-                    mpi = match_id.mpi_id.value.clone();
+                    // delete newly created entity
+                    ctx.client.delete_identity(identity_id.parse()?).await?;
+
+                    // matched mpi
+                    mpi = possible_matches
+                        .into_iter()
+                        .find_map(|p| {
+                            if p.matching_identity.identity.identity_id == link.id {
+                                return Some(p.matching_identity.mpi_id.value);
+                            }
+                            None
+                        })
+                        .ok_or(anyhow!("Target mpi not found"))?;
                 } else {
-                    // keep separate identity
-                    ctx.client.split_identities(link.id).await?;
+                    // dont merge: remove possible matches
+                    for p in possible_matches {
+                        ctx.client.split_identities(p.link_id).await?;
+                    }
                 }
 
                 // create pseudonyms
                 let (participant, lab) = ctx.client.pseudonymize(mpi, payload).await?;
-
                 Ok((StatusCode::OK, Json(IdResponse { participant, lab })).into_response())
             } else {
-                // or return conflicting match
-                let idat: Idat = match_response.matching_identity.identity.clone().into();
-                let prompt_response = PromptResponse {
-                    idat,
-                    link_id: match_id.identity.identity_id,
-                };
+                // or prompt for matches:
 
                 // delete newly created entity
-                ctx.client.delete_identity(assigned_id.identity_id).await?;
+                ctx.client.delete_identity(identity_id.parse()?).await?;
+
+                // return conflicting match
+                let matches = possible_matches
+                    .into_iter()
+                    .map(|m| m.matching_identity.identity.into())
+                    .collect::<Vec<IdMatch>>();
+
+                let prompt_response = PromptResponse { matches };
 
                 Ok((StatusCode::CONFLICT, Json(prompt_response)).into_response())
             }
         }
         MatchStatus::NoMatch | MatchStatus::PerfectMatch => {
             // parse mpi from response
-            let mpi = parse_mpi(res)?;
+            let mpi = parse_mpi(&res)?;
 
             // create pseudonyms
             let (participant, lab) = ctx.client.pseudonymize(mpi.clone(), payload).await?;
@@ -175,24 +174,9 @@ fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
     match_code.map(MatchStatus::try_from)?
 }
 
-fn parse_mpi(params: Parameters) -> Result<String, anyhow::Error> {
-    let parts: Vec<ParametersParameter> = params
-        .parameter
-        .iter()
-        .flatten()
-        .filter_map(|p| {
-            if p.name == "matchResult" {
-                Some(p.part.iter().flatten())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .cloned()
-        .collect();
-
+fn parse_mpi(params: &Parameters) -> Result<String, anyhow::Error> {
     // mpi person resource
-    let person = parts
+    let person = match_result(params)
         .into_iter()
         .filter_map(|part| {
             if part.name == "mpiPerson" {
@@ -220,4 +204,40 @@ fn parse_mpi(params: Parameters) -> Result<String, anyhow::Error> {
         .ok_or(anyhow!(
             "Failed to parse MPI identifier from E-PIX response"
         ))
+}
+
+fn match_result(params: &Parameters) -> Vec<ParametersParameter> {
+    params
+        .parameter
+        .iter()
+        .flatten()
+        .filter_map(|p| {
+            if p.name == "matchResult" {
+                Some(p.part.iter().flatten())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .cloned()
+        .collect()
+}
+
+fn parse_identity_id(params: &Parameters) -> Result<String, anyhow::Error> {
+    // mpi person resource
+    match_result(params)
+        .into_iter()
+        .filter_map(|part| {
+            if part.name == "identity" {
+                Some(
+                    part.resource
+                        .and_then(|p| Patient::try_from(p).ok().and_then(|p| p.id.clone())),
+                )
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .next()
+        .ok_or(anyhow!("Failed to parse person_id from E-PIX response"))
 }

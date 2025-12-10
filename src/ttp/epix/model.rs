@@ -102,18 +102,6 @@ pub(super) struct PossibleMatchesForPerson {
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct PossibleMatchesForDomainBody {
-    #[serde(rename = "ns1:getPossibleMatchesForDomain")]
-    pub(crate) possible_matches_for_domain: PossibleMatchesForDomain,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct PossibleMatchesForDomain {
-    pub(super) domain_name: String,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub(crate) struct AddIdentifierDomainBody {
     #[serde(rename = "ns1:addIdentifierDomain")]
     pub(super) add_identifier_domain: AddIdentifierDomain,
@@ -161,19 +149,6 @@ pub(crate) struct RemovePossibleMatchBody {
 #[serde(rename_all = "camelCase")]
 pub(super) struct RemovePossibleMatch {
     pub(super) possible_match_id: u32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-pub(crate) struct AssignIdentityBody {
-    #[serde(rename = "ns1:assignIdentity")]
-    pub(super) assign_identity: AssignIdentity,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct AssignIdentity {
-    pub(super) possible_match_id: u32,
-    pub(crate) winning_identity_id: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

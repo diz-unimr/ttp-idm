@@ -1,6 +1,5 @@
 use crate::api::IdRequest;
 use crate::config::{Epix, Gpas, Ttp};
-use crate::error::ApiError;
 use crate::ttp::epix::model::{GetPossibleMatchesForPersonResponseBody, PossibleMatchResult};
 use crate::ttp::gpas::model::{GetDomainResponseBody, GetPseudonymsForResponseBody};
 use crate::ttp::gpas::PsnOperation;
@@ -220,31 +219,6 @@ impl TtpClient {
         }
 
         Ok(())
-    }
-
-    pub(crate) async fn merge_identities(
-        &self,
-        link_id: u32,
-        winning_id: u32,
-    ) -> Result<(), ApiError> {
-        let body: String = epix::assign_identity_request(link_id, winning_id).try_into()?;
-
-        let request = self
-            .client
-            .post(format!("{}/epix/epixService?wsdl", self.epix.base_url).as_str())
-            .header(
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("application/soap+xml"),
-            )
-            .body(body);
-
-        let response = request.send().await?;
-
-        response
-            .status()
-            .is_success()
-            .then_some(())
-            .ok_or(anyhow!("E-PIX assignIdentityRequest failed for {}", link_id).into())
     }
 
     pub(crate) async fn new(config: &Ttp) -> Result<Self, anyhow::Error> {
