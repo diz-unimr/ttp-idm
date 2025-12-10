@@ -3,10 +3,9 @@ pub(crate) mod model;
 use crate::ttp::client::SoapEnvelope;
 use crate::ttp::epix::model::{
     AddDataSource, AddDataSourceBody, AddDomain, AddDomainBody, AddIdentifierDomain,
-    AddIdentifierDomainBody, DataSource,
-    DeactivateIdentityBody, DeleteIdentityBody, Domain, IdentifierDomain, Identity, MpiDomain
-    , PossibleMatchesForPerson,
-    PossibleMatchesForPersonBody, RemovePossibleMatch, RemovePossibleMatchBody, SafeSource,
+    AddIdentifierDomainBody, DataSource, DeactivateIdentityBody, DeleteIdentityBody, Domain,
+    IdentifierDomain, Identity, MpiDomain, PossibleMatchesForPerson, PossibleMatchesForPersonBody,
+    RemovePossibleMatch, RemovePossibleMatchBody, SafeSource,
 };
 use std::{env, fs};
 use uuid::Uuid;
@@ -140,10 +139,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_possible_matches_for_person_response() {
+    async fn test_get_matches_serde() {
         let soap = r#"<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
     <soap:Body>
-        <ns1:getPossibleMatchesForPersonResponse xmlns:ns1="http://service.epix.ttp.icmvc.emau.org/">
+        <ns2:getPossibleMatchesForPersonResponse xmlns:ns2="http://service.epix.ttp.icmvc.emau.org/">
             <return>
                 <creationType>OPEN</creationType>
                 <linkId>42</linkId>
@@ -239,7 +238,7 @@ mod tests {
                     <value>1001000000002</value>
                 </requestedMPI>
             </return>
-        </ns1:getPossibleMatchesForPersonResponse>
+        </ns2:getPossibleMatchesForPersonResponse>
     </soap:Body>
 </soap:Envelope>"#;
 
@@ -262,10 +261,10 @@ mod tests {
                             identity_id: 1,
                         },
                         mpi_id: MpiId {
-                            value: "".to_string(),
+                            value: "1001000000001".to_string(),
                         },
                     },
-                    assigned_identity: Identity { identity_id: 0 },
+                    assigned_identity: Identity { identity_id: 2 },
                 }],
             },
         });
