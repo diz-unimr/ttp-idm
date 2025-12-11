@@ -11,9 +11,7 @@
   "paths": {
     "/": {
       "get": {
-        "tags": [
-          "metadata"
-        ],
+        "tags": ["metadata"],
         "summary": "API metadata",
         "operationId": "root",
         "responses": {
@@ -32,9 +30,7 @@
     },
     "/api/pseudonyms": {
       "post": {
-        "tags": [
-          "api"
-        ],
+        "tags": ["api"],
         "summary": "Create pseudonyms for a participant",
         "operationId": "create",
         "requestBody": {
@@ -74,9 +70,7 @@
     },
     "/api/pseudonyms/{trial}/{psn}": {
       "get": {
-        "tags": [
-          "api"
-        ],
+        "tags": ["api"],
         "summary": "Get all pseudonyms for a participant and a trial",
         "operationId": "read",
         "parameters": [
@@ -118,10 +112,7 @@
     "schemas": {
       "IdMatch": {
         "type": "object",
-        "required": [
-          "idat",
-          "link_id"
-        ],
+        "required": ["idat", "link_id"],
         "properties": {
           "idat": {
             "$ref": "#/components/schemas/Idat"
@@ -135,11 +126,7 @@
       },
       "IdRequest": {
         "type": "object",
-        "required": [
-          "idat",
-          "trial",
-          "lab"
-        ],
+        "required": ["idat", "trial", "lab"],
         "properties": {
           "idat": {
             "$ref": "#/components/schemas/Idat"
@@ -172,10 +159,7 @@
       },
       "IdResponse": {
         "type": "object",
-        "required": [
-          "participant",
-          "lab"
-        ],
+        "required": ["participant", "lab"],
         "properties": {
           "lab": {
             "type": "object",
@@ -210,10 +194,7 @@
             "format": "date"
           },
           "birth_name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "birth_place": {
             "type": "string"
@@ -234,10 +215,7 @@
       },
       "Link": {
         "type": "object",
-        "required": [
-          "id",
-          "merge"
-        ],
+        "required": ["id", "merge"],
         "properties": {
           "id": {
             "type": "integer",
@@ -251,9 +229,7 @@
       },
       "PromptResponse": {
         "type": "object",
-        "required": [
-          "matches"
-        ],
+        "required": ["matches"],
         "properties": {
           "matches": {
             "type": "array",
