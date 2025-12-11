@@ -30,10 +30,6 @@ The `lab` property determines the number of pseudonyms to be created for each in
 > [!NOTE]
 > Property _keys_ for these are dynamic.
 
-#### Parameters
-
-> None
-
 #### Body
 
 > | content-type       | data type   | required |
@@ -96,22 +92,12 @@ The `lab` property determines the number of pseudonyms to be created for each in
 
 Get all pseudonyms for a participant by `trial` and `psn`.
 
-#### Parameters
-
-> None
-
-#### Body
-
-> None
-
 #### Responses
 
-> | http code                   | content-type               | response                    |
-> |-----------------------------|----------------------------|-----------------------------|
-> | `200` Ok                    | `application/json`         | `IdResponse`                |
-> | `409` Conflict              | `application/json`         | `PromptResponse`            |
-> | `404` Not Found             | `application/json`         | No matching duplicate found |
-> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message               |
+> | http code       | content-type       | response                              |
+> |-----------------|--------------------|---------------------------------------|
+> | `200` Ok        | `application/json` | `IdResponse`                          |
+> | `404` Not Found | `application/json` | No pseudonyms found for trial and psn |
 
 ### Example
 
