@@ -19,9 +19,11 @@ A copy of the current API doc is located at [/api-docs/openapi.json](/api-docs/o
 Inspect the API
 at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/diz-unimr/ttp-idm/refs/heads/beta/api-docs/openapi.json).
 
-### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for patient)</code>
+### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for participant)</code>
 
-Adds patient to E-PIX and generate pseudonyms and ids for the provided `trial`.
+![Flowchart for the create_pseudonyms workflow](img/create-pseudonyms_v1.2.png)
+
+Adds participant to E-PIX and generate pseudonyms and ids for the provided `trial`.
 
 The `lab` property determines the number of pseudonyms to be created for each individual laboratory by name.
 
@@ -69,6 +71,53 @@ The `lab` property determines the number of pseudonyms to be created for each in
   }
 }
 ```
+
+#### Response
+
+```json
+{
+  "participant": "VYMGJ9TUMDHFPL14",
+  "lab": {
+    "Labor 2": [
+      "0LTKNJNZC5ZEWHG0",
+      "CXPEA1CP85JUKCVJ",
+      "MFXLKP5Y4PPTKUZV",
+      "3XPYZ932JCYAZ8TW"
+    ],
+    "Labor 1": [
+      "CCRPJTW1R8WU6W3P",
+      "1NFTHGWYNVYQEAPY"
+    ]
+  }
+}
+```
+
+### <code>GET</code> <code><b>/api/pseudonyms/{trial}/{psn}</b></code> <code>(get pseudonyms for participant and trial)</code>
+
+Get all pseudonyms for a participant by `trial` and `psn`.
+
+#### Parameters
+
+> None
+
+#### Body
+
+> None
+
+#### Responses
+
+> | http code                   | content-type               | response                    |
+> |-----------------------------|----------------------------|-----------------------------|
+> | `200` Ok                    | `application/json`         | `IdResponse`                |
+> | `409` Conflict              | `application/json`         | `PromptResponse`            |
+> | `404` Not Found             | `application/json`         | No matching duplicate found |
+> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message               |
+
+### Example
+
+#### Request
+
+url: `/api/pseudonyms/Studie/VYMGJ9TUMDHFPL14`
 
 #### Response
 
