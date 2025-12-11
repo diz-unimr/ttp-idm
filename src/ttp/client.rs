@@ -406,9 +406,9 @@ impl TtpClient {
     ) -> anyhow::Result<HashMap<String, Vec<String>>> {
         let mut set = JoinSet::new();
         domains.into_iter().for_each(|d| {
-            let bla = Arc::clone(&self);
+            let client = Arc::clone(&self);
             let mpi = mpi.clone();
-            set.spawn(async move { bla.get_pseudonyms_for_domain(d, mpi).await });
+            set.spawn(async move { client.get_pseudonyms_for_domain(d, mpi).await });
         });
 
         let psns = set
@@ -511,25 +511,6 @@ impl TtpClient {
     }
 }
 
-// async fn parse_response<'a, T: Deserialize>(response: Response) -> anyhow::Result<T>
-// where
-//     SoapEnvelope<T>: TryFrom<&'a str>, // where
-//                                        //     SoapEnvelope<T>: TryFrom<&'a str>,
-// {
-//     if !response.status().is_success() {
-//         let resp_text = response.text().await?;
-//         let fault = FaultEnvelope::try_from(resp_text);
-//         Err(anyhow!(
-//             fault.map(|f: FaultEnvelope| f.body.fault.faultstring)?
-//         ))
-//     } else {
-//         let resp_text = response.text().await?.as_str();
-//         let soap: SoapEnvelope<T> = SoapEnvelope::<T>::try_from(resp_text)?;
-//
-//         Ok(soap.body)
-//     }
-// }
-
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename = "soap:Envelope")]
 pub(crate) struct FaultEnvelope {
@@ -610,7 +591,6 @@ impl<T: serde::Serialize> TryInto<String> for SoapEnvelope<T> {
         let config = serde_xml_rs::SerdeXml::new()
             .namespace("ns1", "http://service.epix.ttp.icmvc.emau.org/")
             .namespace("ns2", "http://psn.ttp.ganimed.icmvc.emau.org/")
-            .namespace("ns2", "http://service.epix.ttp.icmvc.emau.org/")
             .namespace("soap", "http://schemas.xmlsoap.org/soap/envelope/");
 
         let env: String = config.to_string(&self)?;
