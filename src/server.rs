@@ -74,8 +74,10 @@ fn build_router(state: Arc<ApiContext>) -> Router {
     paths(
         root,
         api::create,
+        api::read,
     ),
     components(schemas(
+        model::IdRequest,
         model::IdResponse,
         model::Idat,
         model::PromptResponse,

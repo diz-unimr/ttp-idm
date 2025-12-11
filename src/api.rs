@@ -20,8 +20,21 @@ pub(crate) fn router() -> Router<Arc<ApiContext>> {
         .route("/api/pseudonyms", post(create))
 }
 
+/// Create pseudonyms for a participant
 #[debug_handler]
-#[utoipa::path(post, path = "/api/pseudonyms", responses((status = OK, body = IdResponse)))]
+#[utoipa::path(
+    post,
+    path = "/api/pseudonyms",
+    request_body(
+        content = IdRequest,
+        description = "Participant data and optional match resolution",
+        content_type = "application/json"
+    ),
+    responses(
+        (status = 200, body = IdResponse),
+        (status = 409, body = PromptResponse)
+    ),
+)]
 pub(crate) async fn create(
     State(ctx): State<Arc<ApiContext>>,
     Json(payload): Json<IdRequest>,
@@ -111,8 +124,16 @@ pub(crate) async fn create(
     }
 }
 
+/// Get all pseudonyms for a participant and a trial
 #[debug_handler]
-#[utoipa::path(get, path = "/api/pseudonyms", responses((status = OK, body = IdResponse)))]
+#[utoipa::path(
+    get,
+    path = "/api/pseudonyms/{trial}/{psn}", params(
+        ("trial" = String, Path, description = "The trial"),
+        ("psn" = String, Path, description = "Participant pseudonym"),
+    ),
+    responses((status = OK, body = IdResponse))
+)]
 pub(crate) async fn read(
     State(ctx): State<Arc<ApiContext>>,
     Path((trial, psn)): Path<(String, String)>,
@@ -136,8 +157,8 @@ pub(crate) async fn read(
     ))
 }
 
-fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
-    let match_code: anyhow::Result<&str> = params
+fn match_result(params: &Parameters) -> impl Iterator<Item = &ParametersParameter> {
+    params
         .parameter
         .iter()
         .flatten()
@@ -149,6 +170,10 @@ fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
             }
         })
         .flatten()
+}
+
+fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
+    let match_code: anyhow::Result<&str> = match_result(params)
         .find_map(|p| {
             if p.name == "matchStatus" {
                 return match &p.value {
@@ -177,10 +202,9 @@ fn match_status(params: &Parameters) -> anyhow::Result<MatchStatus> {
 fn parse_mpi(params: &Parameters) -> Result<String, anyhow::Error> {
     // mpi person resource
     let person = match_result(params)
-        .into_iter()
         .filter_map(|part| {
             if part.name == "mpiPerson" {
-                Some(part.resource.and_then(|p| Person::try_from(p).ok()))
+                Some(part.resource.clone().and_then(|p| Person::try_from(p).ok()))
             } else {
                 None
             }
@@ -206,31 +230,14 @@ fn parse_mpi(params: &Parameters) -> Result<String, anyhow::Error> {
         ))
 }
 
-fn match_result(params: &Parameters) -> Vec<ParametersParameter> {
-    params
-        .parameter
-        .iter()
-        .flatten()
-        .filter_map(|p| {
-            if p.name == "matchResult" {
-                Some(p.part.iter().flatten())
-            } else {
-                None
-            }
-        })
-        .flatten()
-        .cloned()
-        .collect()
-}
-
 fn parse_identity_id(params: &Parameters) -> Result<String, anyhow::Error> {
     // mpi person resource
     match_result(params)
-        .into_iter()
         .filter_map(|part| {
             if part.name == "identity" {
                 Some(
                     part.resource
+                        .clone()
                         .and_then(|p| Patient::try_from(p).ok().and_then(|p| p.id.clone())),
                 )
             } else {

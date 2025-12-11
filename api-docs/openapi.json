@@ -35,8 +35,10 @@
         "tags": [
           "api"
         ],
+        "summary": "Create pseudonyms for a participant",
         "operationId": "create",
         "requestBody": {
+          "description": "Participant data and optional match resolution",
           "content": {
             "application/json": {
               "schema": {
@@ -56,6 +58,57 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pseudonyms/{trial}/{psn}": {
+      "get": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Get all pseudonyms for a participant and a trial",
+        "operationId": "read",
+        "parameters": [
+          {
+            "name": "trial",
+            "in": "path",
+            "description": "The trial",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "psn",
+            "in": "path",
+            "description": "Participant pseudonym",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -63,6 +116,23 @@
   },
   "components": {
     "schemas": {
+      "IdMatch": {
+        "type": "object",
+        "required": [
+          "idat",
+          "link_id"
+        ],
+        "properties": {
+          "idat": {
+            "$ref": "#/components/schemas/Idat"
+          },
+          "link_id": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "IdRequest": {
         "type": "object",
         "required": [
@@ -182,17 +252,14 @@
       "PromptResponse": {
         "type": "object",
         "required": [
-          "idat",
-          "link_id"
+          "matches"
         ],
         "properties": {
-          "idat": {
-            "$ref": "#/components/schemas/Idat"
-          },
-          "link_id": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdMatch"
+            }
           }
         }
       }
