@@ -1,0 +1,249 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ttp-idm",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["metadata"],
+        "summary": "API metadata",
+        "operationId": "root",
+        "responses": {
+          "200": {
+            "description": "TTP ID Management Web API",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pseudonyms": {
+      "post": {
+        "tags": ["api"],
+        "summary": "Create pseudonyms for a participant",
+        "operationId": "create",
+        "requestBody": {
+          "description": "Participant data and optional match resolution",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pseudonyms/{trial}/{psn}": {
+      "get": {
+        "tags": ["api"],
+        "summary": "Get all pseudonyms for a participant and a trial",
+        "operationId": "read",
+        "parameters": [
+          {
+            "name": "trial",
+            "in": "path",
+            "description": "The trial",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "psn",
+            "in": "path",
+            "description": "Participant pseudonym",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "IdMatch": {
+        "type": "object",
+        "required": ["idat", "link_id"],
+        "properties": {
+          "idat": {
+            "$ref": "#/components/schemas/Idat"
+          },
+          "link_id": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "IdRequest": {
+        "type": "object",
+        "required": ["idat", "trial", "lab"],
+        "properties": {
+          "idat": {
+            "$ref": "#/components/schemas/Idat"
+          },
+          "lab": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "link": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Link"
+              }
+            ]
+          },
+          "trial": {
+            "type": "string"
+          }
+        }
+      },
+      "IdResponse": {
+        "type": "object",
+        "required": ["participant", "lab"],
+        "properties": {
+          "lab": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "participant": {
+            "type": "string"
+          }
+        }
+      },
+      "Idat": {
+        "type": "object",
+        "required": [
+          "first_name",
+          "last_name",
+          "birth_date",
+          "birth_place",
+          "postal_code",
+          "city"
+        ],
+        "properties": {
+          "birth_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "birth_name": {
+            "type": ["string", "null"]
+          },
+          "birth_place": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "postal_code": {
+            "type": "string"
+          }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "required": ["id", "merge"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "merge": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PromptResponse": {
+        "type": "object",
+        "required": ["matches"],
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdMatch"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "pseudonymization"
+    }
+  ]
+}

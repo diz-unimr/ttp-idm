@@ -12,15 +12,23 @@ This service provides identity and pseudonym management with the Trusted third p
 
 ## API
 
-### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for patient)</code>
+An OpenApi spec is generated when building the service which can be obtained from `/api-docs/openapi.json` at runtime
+or via the SwaggerUI (`/swagger-ui`) endpoint.
 
-Adds patient to E-PIX and generate pseudonyms and ids for the provided `study`.
+A copy of the current API doc is located at [/api-docs/openapi.json](/api-docs/openapi.json).
+Inspect the API
+at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/diz-unimr/ttp-idm/refs/heads/beta/api-docs/openapi.json).
 
-The property `lab_id_count` determines the number of secondary pseudonyms to be created.
+### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for participant)</code>
 
-#### Parameters
+![Flowchart for the create_pseudonyms workflow](img/create-pseudonyms_v1.2.svg)
 
-> None
+Adds participant to E-PIX and generate pseudonyms and ids for the provided `trial`.
+
+The `lab` property determines the number of pseudonyms to be created for each individual laboratory by name.
+
+> [!NOTE]
+> Property _keys_ for these are dynamic.
 
 #### Body
 
@@ -28,82 +36,92 @@ The property `lab_id_count` determines the number of secondary pseudonyms to be 
 > |--------------------|-------------|----------|
 > | `application/json` | `IdRequest` | true     |
 
-##### IdRequest (JSON Schema)
+#### Responses
+
+> | http code                   | content-type               | response                    |
+> |-----------------------------|----------------------------|-----------------------------|
+> | `200` Ok                    | `application/json`         | `IdResponse`                |
+> | `409` Conflict              | `application/json`         | `PromptResponse`            |
+> | `404` Not Found             | `application/json`         | No matching duplicate found |
+> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message               |
+
+### Example
+
+#### Request
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "first_name": {
-      "type": "string"
-    },
-    "last_name": {
-      "type": "string"
-    },
-    "birth_date": {
-      "type": "string",
-      "format": "date"
-    },
-    "birth_place": {
-      "type": "string"
-    },
-    "birth_name": {
-      "type": "string"
-    },
-    "postal_code": {
-      "type": "string"
-    },
-    "city": {
-      "type": "string"
-    },
-    "study": {
-      "type": "string"
-    },
-    "lab_id_count": {
-      "type": "number"
-    }
+  "idat": {
+    "first_name": "Erika",
+    "last_name": "Mustermann",
+    "birth_name": "Musterfrau",
+    "birth_date": "1975-08-22",
+    "birth_place": "Musterstadt",
+    "postal_code": "35037",
+    "city": "Marburg"
   },
-  "required": [
-    "first_name",
-    "last_name",
-    "birth_date",
-    "birth_place",
-    "postal_code",
-    "city",
-    "study",
-    "lab_id_count"
-  ]
+  "trial": "Studie",
+  "lab": {
+    "Labor 1": 2,
+    "Labor 2": 4
+  }
 }
 ```
 
-#### Responses
-
-> | http code                   | content-type               | response      |
-> |-----------------------------|----------------------------|---------------|
-> | `200` Ok                    | `application/json`         | `IdResponse`  |
-> | `201` Created               | `application/json`         | `IdResponse`  |
-> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message |
-
-### IdResponse (JSON Schema)
+#### Response
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "patient_id": {
-      "type": "string"
-    },
-    "lab_ids": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    }
-  },
-  "required": [
-    "patient_id",
-    "lab_ids"
-  ]
+  "participant": "VYMGJ9TUMDHFPL14",
+  "lab": {
+    "Labor 2": [
+      "0LTKNJNZC5ZEWHG0",
+      "CXPEA1CP85JUKCVJ",
+      "MFXLKP5Y4PPTKUZV",
+      "3XPYZ932JCYAZ8TW"
+    ],
+    "Labor 1": [
+      "CCRPJTW1R8WU6W3P",
+      "1NFTHGWYNVYQEAPY"
+    ]
+  }
+}
+```
+
+### <code>GET</code> <code><b>/api/pseudonyms/{trial}/{psn}</b></code> <code>(get pseudonyms for participant and trial)</code>
+
+Get all pseudonyms for a participant by `trial` and `psn`.
+
+#### Responses
+
+> | http code       | content-type       | response                              |
+> |-----------------|--------------------|---------------------------------------|
+> | `200` Ok        | `application/json` | `IdResponse`                          |
+> | `404` Not Found | `application/json` | No pseudonyms found for trial and psn |
+
+### Example
+
+#### Request
+
+url: `/api/pseudonyms/Studie/VYMGJ9TUMDHFPL14`
+
+#### Response
+
+```json
+{
+  "participant": "VYMGJ9TUMDHFPL14",
+  "lab": {
+    "Labor 2": [
+      "0LTKNJNZC5ZEWHG0",
+      "CXPEA1CP85JUKCVJ",
+      "MFXLKP5Y4PPTKUZV",
+      "3XPYZ932JCYAZ8TW"
+    ],
+    "Labor 1": [
+      "CCRPJTW1R8WU6W3P",
+      "1NFTHGWYNVYQEAPY"
+    ]
+  }
 }
 ```
 
@@ -114,13 +132,11 @@ Application properties are read from a properties file ([app.yaml](./app.yaml)) 
 | Name                          | Default           | Description                             | Required |
 |-------------------------------|-------------------|-----------------------------------------|----------|
 | `log_level`                   | info              | Log level (error,warn,info,debug,trace) |          |
-| `auth.basic.username`         |                   | Basic auth username for this service    |          |
-| `auth.basic.password`         |                   | Basic auth password for this service    |          |
 | `ttp.epix.base_url`           |                   | E-PIX base url                          | ✓        |
-| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        | ✓        |
-| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            | ✓        |
-| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             | ✓        |
-| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    | ✓        |
+| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        |          |
+| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            |          |
+| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             |          |
+| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    |          |
 | `ttp.gpas.base_url`           |                   | gPAS base url                           | ✓        |
 | `ttp.timeout`                 | 120               | Retry timeout                           |          |
 
@@ -138,14 +154,10 @@ query:
   image: ghcr.io/diz-unimr/ttp-idm:latest
   environment:
     LOG_LEVEL: debug
-    AUTH__BASIC__PASSWORD: test
-    AUTH__BASIC__USERNAME: test
     TTP__EPIX__BASE_URL: http://localhost:8080
+    TTP__EPIX__DOMAIN__NAME: trial
     TTP__GPAS__BASE_URL: http://localhost:8081
-    TTP__RETRY__COUNT: 3
-    TTP__RETRY__TIMEOUT: 5
-    TTP__RETRY__WAIT: 2
-    TTP__RETRY__MAX_WAIT: 15
+    TTP__TIMEOUT: 60
 ```
 
 ## License

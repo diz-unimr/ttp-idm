@@ -1,7 +1,7 @@
-FROM rust:1.90.0-alpine3.22 AS build
+FROM rust:1.91.1-alpine3.22 AS build
 
 RUN set -ex && \
-    apk add --no-progress --no-cache musl-dev
+    apk add --no-progress --no-cache musl-dev curl
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock /app/
@@ -24,6 +24,7 @@ RUN addgroup -g $GID $GROUP && \
 WORKDIR /app/
 COPY --from=build /app/target/release/ttp-idm ./
 COPY ./app.yaml ./
+COPY ./resources/matching_config.xml ./resources/matching_config.xml
 USER $USER
 EXPOSE 3000
 
