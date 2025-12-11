@@ -21,7 +21,7 @@ at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.c
 
 ### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for participant)</code>
 
-![Flowchart for the create_pseudonyms workflow](img/create-pseudonyms_v1.2.png)
+![Flowchart for the create_pseudonyms workflow](img/create-pseudonyms_v1.2.svg)
 
 Adds participant to E-PIX and generate pseudonyms and ids for the provided `trial`.
 
