@@ -1,4 +1,8 @@
 log_level: info
+#auth:
+#  oidc:
+#    client_id:
+#    issuer_url:
 ttp:
   epix:
     base_url:
