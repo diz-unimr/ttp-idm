@@ -1,10 +1,23 @@
 use config::{Config, ConfigError, Environment, File};
 use serde_derive::Deserialize;
+use std::option::Option;
 
 #[derive(Default, Deserialize, Clone)]
 pub(crate) struct AppConfig {
     pub(crate) log_level: String,
+    pub(crate) auth: Option<Auth>,
     pub(crate) ttp: Ttp,
+}
+
+#[derive(Default, Deserialize, Clone)]
+pub(crate) struct Auth {
+    pub(crate) oidc: Option<Oidc>,
+}
+
+#[derive(Default, Deserialize, Clone)]
+pub(crate) struct Oidc {
+    pub(crate) client_id: String,
+    pub(crate) issuer_url: String,
 }
 
 #[derive(Default, Deserialize, Clone)]
