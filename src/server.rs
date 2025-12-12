@@ -2,8 +2,9 @@ use crate::api;
 use crate::config::AppConfig;
 use crate::model;
 use crate::ttp::client::TtpClient;
+use auth::oidc::Oidc as OidcAuth;
 use axum::routing::get;
-use axum::Router;
+use axum::{middleware, Router};
 use log::info;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -45,10 +46,19 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     client.test_connection().await?;
     client.setup_domains().await?;
 
-    // context
+    // api state
     let state = Arc::new(ApiContext { client });
+    // auth state
+    let auth_state = match config
+        .auth
+        .and_then(|auth| auth.oidc)
+        .map(|o| OidcAuth::new(o.client_id, o.issuer_url))
+    {
+        None => None,
+        Some(res) => Some(Arc::new(res.await?)),
+    };
 
-    let router = build_router(state);
+    let router = build_router(state, auth_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
     info!("Listening on {}", listener.local_addr()?);
@@ -60,13 +70,22 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     .map_err(|e| e.into())
 }
 
-fn build_router(state: Arc<ApiContext>) -> Router {
-    Router::new()
+fn build_router(api_state: Arc<ApiContext>, auth_state: Option<Arc<OidcAuth>>) -> Router {
+    let mut router = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(root))
         .merge(api::router())
-        .with_state(state)
-        .layer(TraceLayer::new_for_http())
+        .with_state(api_state)
+        .layer(TraceLayer::new_for_http());
+
+    if let Some(auth) = auth_state {
+        router = router.layer(middleware::from_fn_with_state(
+            auth,
+            auth::oidc::auth_middleware,
+        ))
+    }
+
+    router
 }
 
 #[derive(OpenApi)]
@@ -95,23 +114,22 @@ mod tests {
 
     #[tokio::test]
     async fn root_test() {
-        let config = AppConfig {
-            log_level: "".to_string(),
-            ttp: Default::default(),
-        };
-        let state = Arc::new(ApiContext {
-            client: TtpClient::new(&config.ttp).await.unwrap(),
-        });
+        let config = AppConfig::default();
+        {
+            let state = Arc::new(ApiContext {
+                client: TtpClient::new(&config.ttp).await.unwrap(),
+            });
 
-        // test server
-        let router = build_router(state);
-        let server = TestServer::new(router).unwrap();
+            // test server
+            let router = build_router(state, None);
+            let server = TestServer::new(router).unwrap();
 
-        // send request
-        let response = server.get("/").await;
+            // send request
+            let response = server.get("/").await;
 
-        // assert
-        response.assert_status_ok();
-        response.assert_text("TTP ID Management API");
+            // assert
+            response.assert_status_ok();
+            response.assert_text("TTP ID Management API");
+        }
     }
 }
