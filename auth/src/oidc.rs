@@ -11,7 +11,7 @@ use log::{debug, error};
 use oauth2::basic::{BasicClient, BasicRequestTokenError};
 use oauth2::url::ParseError;
 use oauth2::{EndpointNotSet, EndpointSet};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 #[derive(Debug, thiserror::Error)]

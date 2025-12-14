@@ -10,7 +10,7 @@ use fhir_model::r4b::types::Coding;
 use log::{debug, error, info, warn};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::{header, Client, Error, Response};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
