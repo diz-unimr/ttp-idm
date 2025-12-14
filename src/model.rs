@@ -5,7 +5,7 @@ use fhir_model::r4b::codes::NameUse;
 use fhir_model::r4b::resources::{Patient, Resource};
 use fhir_model::r4b::types::{Address, Extension, ExtensionValue, HumanName, Meta};
 use fhir_model::Date;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use time::error::ComponentRange;
 

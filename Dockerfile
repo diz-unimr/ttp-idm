@@ -1,14 +1,18 @@
-FROM rust:1.91.1-alpine3.22 AS build
+FROM rust:1.92.0-alpine3.23 AS build
 
 RUN set -ex && \
-    apk add --no-progress --no-cache musl-dev curl
+    apk add --no-progress --no-cache musl-dev openssl-dev openssl-libs-static curl
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock /app/
 COPY ./src /app/src
+
+COPY ./auth/Cargo.toml ./auth/Cargo.lock /app/auth/
+COPY ./auth/src /app/auth/src
+
 RUN cargo build --release
 
-FROM alpine:3.22 AS run
+FROM alpine:3.23 AS run
 
 RUN apk add --no-progress --no-cache tzdata
 

@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename = "soap:Envelope")]
@@ -99,9 +99,9 @@ pub(crate) enum PsnOperation {
     Identify,
 }
 
-impl Into<String> for PsnOperation {
-    fn into(self) -> String {
-        match self {
+impl From<PsnOperation> for String {
+    fn from(value: PsnOperation) -> Self {
+        match value {
             PsnOperation::Pseudonymize => "original".into(),
             PsnOperation::Identify => "pseudonym".into(),
         }
