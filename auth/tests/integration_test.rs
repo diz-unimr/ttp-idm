@@ -52,6 +52,7 @@ async fn success() {
         }]
     });
 
+    // secretlint-disable
     let test_key = r#"-----BEGIN PRIVATE KEY-----
         MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDjsyRN/6ZC3K5P
         U9HSKssaBjZXlQB4NgGgOeMXlUX6nP8vxrcQIgi2i03gx/WaOkL7o01GXrOAhDcp
@@ -80,6 +81,7 @@ async fn success() {
         exFfeOgb+NPUocNzKygFOqeWgF+ugefeAa6nw8b1tEdVxOmS7B9pkZ9oIhy2+xs7
         gmxwdyUdvwcZMDRwnuiMGNfC
         -----END PRIVATE KEY-----"#;
+    // secretlint-enable
 
     let (server, mock) = setup_test_server_with_jwks(Some(jwks.clone())).await;
     let token = create_jwt(
