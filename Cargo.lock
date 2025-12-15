@@ -178,13 +178,18 @@ dependencies = [
  "async-oidc-jwt-validator",
  "axum",
  "axum-extra",
+ "axum-test",
+ "chrono",
  "http",
+ "httpmock",
  "jsonwebtoken",
  "log",
  "oauth2",
  "reqwest",
  "serde",
+ "serde_json",
  "thiserror 2.0.17",
+ "tokio",
 ]
 
 [[package]]
