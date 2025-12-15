@@ -36,7 +36,7 @@ pub type BasicClientSet =
     BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Claims {
+pub struct Claims {
     pub sub: String,
     pub exp: usize,
     pub iat: usize,
@@ -66,7 +66,7 @@ impl Oidc {
                 Ok(())
             }
             Err(e) => {
-                error!("Bearer token validation failed: {}", e);
+                error!("Bearer token validation failed: {e}");
                 Err(AuthError::JWT(e))
             }
         }
@@ -106,7 +106,7 @@ impl DiscoveryDocument {
 }
 
 async fn discover(issuer_url: &str) -> Result<DiscoveryDocument, AuthError> {
-    let discovery_url = format!("{}/.well-known/openid-configuration", issuer_url);
+    let discovery_url = format!("{issuer_url}/.well-known/openid-configuration");
 
     debug!("Fetching OpenID Connect discovery from: {}", discovery_url);
 
@@ -120,8 +120,7 @@ async fn discover(issuer_url: &str) -> Result<DiscoveryDocument, AuthError> {
 
     if !content_type.starts_with("application/json") {
         return Err(Client(format!(
-            "Unexpected Content-Type: '{}', expected 'application/json'",
-            content_type
+            "Unexpected Content-Type: '{content_type}', expected 'application/json'"
         )));
     }
 
