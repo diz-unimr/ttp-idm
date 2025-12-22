@@ -17,7 +17,7 @@ or via the SwaggerUI (`/swagger-ui`) endpoint.
 
 A copy of the current API doc is located at [/api-docs/openapi.json](/api-docs/openapi.json).
 Inspect the API
-at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/diz-unimr/ttp-idm/refs/heads/beta/api-docs/openapi.json).
+at [swagger.io](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/diz-unimr/ttp-idm/refs/heads/main/api-docs/openapi.json).
 
 ### <code>POST</code> <code><b>/api/pseudonyms</b></code> <code>(create pseudonyms for participant)</code>
 

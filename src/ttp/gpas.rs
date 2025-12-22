@@ -137,7 +137,33 @@ pub(crate) fn parse_pseudonym(params: Parameters, target: &str) -> anyhow::Resul
             _ => None,
         })
         .next()
-        .ok_or(anyhow!("Failed to parse pseudonym from gPAS response"))
+        .ok_or(anyhow!(parse_error(params).unwrap_or(
+            "Failed to parse pseudonym from gPAS response".into()
+        )))
+}
+
+fn parse_error(params: Parameters) -> Option<String> {
+    params
+        .parameter
+        .iter()
+        .flatten()
+        .filter_map(|p| {
+            if p.name == "error" {
+                Some(p.part.iter().flatten())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .filter_map(|p| match p.name.as_str() {
+            "error-code" => Some(&p.value),
+            _ => None,
+        })
+        .filter_map(|p| match &p {
+            Some(ParametersParameterValue::Coding(v)) => v.display.clone(),
+            _ => None,
+        })
+        .next()
 }
 
 pub(crate) fn parse_secondary(params: Parameters) -> Vec<String> {
