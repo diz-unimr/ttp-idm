@@ -7,6 +7,7 @@ use fhir_model::r4b::types::{Address, Extension, ExtensionValue, HumanName, Meta
 use fhir_model::Date;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use time::error::ComponentRange;
 
 pub(crate) enum MatchStatus {
@@ -35,6 +36,27 @@ impl TryFrom<&str> for MatchStatus {
             other => Err(anyhow!(
                 "Failed to parse MatchStatus. Unknown code: {other}"
             )),
+        }
+    }
+}
+
+impl From<MatchStatus> for String {
+    fn from(value: MatchStatus) -> Self {
+        value.to_string()
+    }
+}
+
+impl fmt::Display for MatchStatus {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MatchStatus::NoMatch => write!(f, "NoMatch"),
+            MatchStatus::PerfectMatch => write!(f, "PerfectMatch"),
+            MatchStatus::ExternalMatch => write!(f, "ExternalMatch"),
+            MatchStatus::Match => write!(f, "Match"),
+            MatchStatus::MatchError => write!(f, "MatchError"),
+            MatchStatus::MultipleMatch => write!(f, "MultipleMatch"),
+            MatchStatus::PerfectMatchWithUpdate => write!(f, "PerfectMatchWithUpdate"),
+            MatchStatus::PossibleMatch => write!(f, "PossibleMatch"),
         }
     }
 }

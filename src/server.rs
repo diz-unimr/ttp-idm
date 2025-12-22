@@ -10,8 +10,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa::openapi::security::{ClientCredentials, Flow, OAuth2, Scopes, SecurityScheme};
+use utoipa::{Modify, OpenApi};
+use utoipa_swagger_ui::{Config, SwaggerUi};
 
 #[derive(Clone)]
 pub(crate) struct ApiContext {
@@ -71,21 +72,26 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
 }
 
 fn build_router(api_state: Arc<ApiContext>, auth_state: Option<Arc<OidcAuth>>) -> Router {
-    let mut router = Router::new()
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+    api_route(auth_state)
         .route("/", get(root))
-        .merge(api::router())
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+                .config(Config::default().try_it_out_enabled(false)),
+        )
         .with_state(api_state)
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+}
 
+fn api_route(auth_state: Option<Arc<OidcAuth>>) -> Router<Arc<ApiContext>> {
     if let Some(auth) = auth_state {
-        router = router.layer(middleware::from_fn_with_state(
+        api::router().layer(middleware::from_fn_with_state(
             auth,
             auth::oidc::auth_middleware,
         ))
+    } else {
+        api::router()
     }
-
-    router
 }
 
 #[derive(OpenApi)]
@@ -102,9 +108,25 @@ fn build_router(api_state: Arc<ApiContext>, auth_state: Option<Arc<OidcAuth>>) -
         model::PromptResponse,
         model::Link,
     )),
-    tags((name = "pseudonymization"))
+    modifiers(&SecurityAddon),
+    tags((name = "Pseudonym management"))
 )]
 struct ApiDoc;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "oauth",
+                SecurityScheme::OAuth2(OAuth2::new([Flow::ClientCredentials(
+                    ClientCredentials::new("https://localhost/token", Scopes::new()),
+                )])),
+            )
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -137,7 +137,33 @@ pub(crate) fn parse_pseudonym(params: Parameters, target: &str) -> anyhow::Resul
             _ => None,
         })
         .next()
-        .ok_or(anyhow!("Failed to parse pseudonym from gPAS response"))
+        .ok_or(anyhow!(parse_error(params).unwrap_or(
+            "Failed to parse pseudonym from gPAS response".into()
+        )))
+}
+
+fn parse_error(params: Parameters) -> Option<String> {
+    params
+        .parameter
+        .iter()
+        .flatten()
+        .filter_map(|p| {
+            if p.name == "error" {
+                Some(p.part.iter().flatten())
+            } else {
+                None
+            }
+        })
+        .flatten()
+        .filter_map(|p| match p.name.as_str() {
+            "error-code" => Some(&p.value),
+            _ => None,
+        })
+        .filter_map(|p| match &p {
+            Some(ParametersParameterValue::Coding(v)) => v.display.clone(),
+            _ => None,
+        })
+        .next()
 }
 
 pub(crate) fn parse_secondary(params: Parameters) -> Vec<String> {
@@ -168,7 +194,9 @@ pub(crate) fn parse_secondary(params: Parameters) -> Vec<String> {
 mod tests {
     use crate::ttp::client::FaultException::DomainInUse;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
-    use crate::ttp::gpas::create_domain_request;
+    use crate::ttp::gpas::{create_domain_request, parse_error};
+    use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
+    use fhir_model::r4b::types::Coding;
 
     #[test]
     fn add_domain_envelope_test() {
@@ -244,5 +272,35 @@ mod tests {
                 }
             }
         );
+    }
+
+    #[test]
+    fn parse_error_test() {
+        let params = Parameters::builder()
+            .parameter(vec![Some(
+                ParametersParameter::builder()
+                    .name("error".into())
+                    .part(vec![Some(
+                        ParametersParameter::builder()
+                            .name("error-code".into())
+                            .value(ParametersParameterValue::Coding(
+                                Coding::builder()
+                                    .display("Not Found".into())
+                                    .build()
+                                    .unwrap(),
+                            ))
+                            .build()
+                            .unwrap(),
+                    )])
+                    .build()
+                    .unwrap(),
+            )])
+            .build()
+            .unwrap();
+
+        // act
+        let err = parse_error(params);
+
+        assert_eq!(Some("Not Found".into()), err);
     }
 }

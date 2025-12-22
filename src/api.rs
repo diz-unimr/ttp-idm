@@ -32,8 +32,12 @@ pub(crate) fn router() -> Router<Arc<ApiContext>> {
     ),
     responses(
         (status = 200, body = IdResponse),
-        (status = 409, body = PromptResponse)
+        (status = 409, body = PromptResponse),
+        (status = 401)
     ),
+    security(
+        ("oauth" = []),
+    )
 )]
 pub(crate) async fn create(
     State(ctx): State<Arc<ApiContext>>,
@@ -44,23 +48,6 @@ pub(crate) async fn create(
 
     // parse response
     match match_status(&res)? {
-        MatchStatus::MatchError => Err(anyhow!("E-PIX addPerson failed with MatchError"))?,
-        MatchStatus::MultipleMatch => {
-            log::error!("MultipleMatch");
-            todo!("handle multiple matches")
-        }
-        MatchStatus::ExternalMatch => {
-            log::error!("ExternalMatch");
-            todo!("handle these")
-        }
-        MatchStatus::PerfectMatchWithUpdate => {
-            log::error!("PerfectMatchWithUpdate");
-            todo!("handle these")
-        }
-        MatchStatus::Match => {
-            log::error!("Match");
-            todo!("handle these")
-        }
         MatchStatus::PossibleMatch => {
             // get possible matches
             let mut mpi = parse_mpi(&res)?;
@@ -84,7 +71,10 @@ pub(crate) async fn create(
                             }
                             None
                         })
-                        .ok_or(anyhow!("Target mpi not found"))?;
+                        .ok_or(ApiError(
+                            anyhow!("Link.id {} does not match with provided idat", link.id),
+                            StatusCode::NOT_FOUND,
+                        ))?;
                 } else {
                     // dont merge: remove possible matches
                     for p in possible_matches {
@@ -121,6 +111,9 @@ pub(crate) async fn create(
 
             Ok((StatusCode::OK, Json(IdResponse { participant, lab })).into_response())
         }
+        m => Err(anyhow!(
+            "E-PIX addPerson failed with unexpected MatchError: {m}"
+        ))?,
     }
 }
 
@@ -132,14 +125,30 @@ pub(crate) async fn create(
         ("trial" = String, Path, description = "The trial"),
         ("psn" = String, Path, description = "Participant pseudonym"),
     ),
-    responses((status = OK, body = IdResponse))
+    responses(
+        (status = 200, body = IdResponse),
+        (status = 401),
+        (status = 404)
+    ),
+    security(
+        ("oauth" = []),
+    )
 )]
 pub(crate) async fn read(
     State(ctx): State<Arc<ApiContext>>,
     Path((trial, psn)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, ApiError> {
     // get mpi
-    let mpi = ctx.client.identify(trial.clone(), psn.clone()).await?;
+    let mpi = ctx
+        .client
+        .identify(trial.clone(), psn.clone())
+        .await
+        .map_err(|_| {
+            ApiError(
+                anyhow!("No pseudonyms found for trial and psn"),
+                StatusCode::NOT_FOUND,
+            )
+        })?;
 
     // get domains
     let domains = ctx.client.get_secondary_domains(trial.clone()).await?;
