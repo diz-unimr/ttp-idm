@@ -2,6 +2,7 @@ log_level: info
 #auth:
 #  oidc:
 #    client_id:
+#    client_secret:
 #    issuer_url:
 ttp:
   epix:

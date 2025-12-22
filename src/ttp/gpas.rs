@@ -194,7 +194,9 @@ pub(crate) fn parse_secondary(params: Parameters) -> Vec<String> {
 mod tests {
     use crate::ttp::client::FaultException::DomainInUse;
     use crate::ttp::client::{Fault, FaultBody, FaultEnvelope};
-    use crate::ttp::gpas::create_domain_request;
+    use crate::ttp::gpas::{create_domain_request, parse_error};
+    use fhir_model::r4b::resources::{Parameters, ParametersParameter, ParametersParameterValue};
+    use fhir_model::r4b::types::Coding;
 
     #[test]
     fn add_domain_envelope_test() {
@@ -270,5 +272,35 @@ mod tests {
                 }
             }
         );
+    }
+
+    #[test]
+    fn parse_error_test() {
+        let params = Parameters::builder()
+            .parameter(vec![Some(
+                ParametersParameter::builder()
+                    .name("error".into())
+                    .part(vec![Some(
+                        ParametersParameter::builder()
+                            .name("error-code".into())
+                            .value(ParametersParameterValue::Coding(
+                                Coding::builder()
+                                    .display("Not Found".into())
+                                    .build()
+                                    .unwrap(),
+                            ))
+                            .build()
+                            .unwrap(),
+                    )])
+                    .build()
+                    .unwrap(),
+            )])
+            .build()
+            .unwrap();
+
+        // act
+        let err = parse_error(params);
+
+        assert_eq!(Some("Not Found".into()), err);
     }
 }

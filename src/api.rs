@@ -71,7 +71,10 @@ pub(crate) async fn create(
                             }
                             None
                         })
-                        .ok_or(anyhow!("Target mpi not found"))?;
+                        .ok_or(ApiError(
+                            anyhow!("Link.id {} does not match with provided idat", link.id),
+                            StatusCode::NOT_FOUND,
+                        ))?;
                 } else {
                     // dont merge: remove possible matches
                     for p in possible_matches {
@@ -140,7 +143,12 @@ pub(crate) async fn read(
         .client
         .identify(trial.clone(), psn.clone())
         .await
-        .map_err(|e| ApiError(e, StatusCode::NOT_FOUND))?;
+        .map_err(|_| {
+            ApiError(
+                anyhow!("No pseudonyms found for trial and psn"),
+                StatusCode::NOT_FOUND,
+            )
+        })?;
 
     // get domains
     let domains = ctx.client.get_secondary_domains(trial.clone()).await?;

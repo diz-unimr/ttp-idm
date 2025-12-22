@@ -38,12 +38,12 @@ The `lab` property determines the number of pseudonyms to be created for each in
 
 #### Responses
 
-> | http code                   | content-type               | response                    |
-> |-----------------------------|----------------------------|-----------------------------|
-> | `200` Ok                    | `application/json`         | `IdResponse`                |
-> | `409` Conflict              | `application/json`         | `PromptResponse`            |
-> | `404` Not Found             | `application/json`         | No matching duplicate found |
-> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message               |
+> | http code                   | content-type               | response                                  |
+> |-----------------------------|----------------------------|-------------------------------------------|
+> | `200` Ok                    | `application/json`         | `IdResponse`                              |
+> | `409` Conflict              | `application/json`         | `PromptResponse`                          |
+> | `404` Not Found             | `application/json`         | Link.id does not match with provided idat |
+> | `500` Internal Server Error | `text/plain;charset=UTF-8` | Error message                             |
 
 ### Example
 
@@ -125,20 +125,28 @@ url: `/api/pseudonyms/Studie/VYMGJ9TUMDHFPL14`
 }
 ```
 
+### Authorization
+
+OAuth2 Client credentials flow can be configured in order to authorize trusted clients by providing a valid access token
+from the issuer (Authorization server).
+
 ## Configuration properties
 
 Application properties are read from a properties file ([app.yaml](./app.yaml)) with default values.
 
-| Name                          | Default           | Description                             | Required |
-|-------------------------------|-------------------|-----------------------------------------|----------|
-| `log_level`                   | info              | Log level (error,warn,info,debug,trace) |          |
-| `ttp.epix.base_url`           |                   | E-PIX base url                          | ✓        |
-| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                        |          |
-| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description            |          |
-| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain             |          |
-| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                    |          |
-| `ttp.gpas.base_url`           |                   | gPAS base url                           | ✓        |
-| `ttp.timeout`                 | 120               | Retry timeout                           |          |
+| Name                          | Default           | Description                              | Required |
+|-------------------------------|-------------------|------------------------------------------|----------|
+| `log_level`                   | info              | Log level (error,warn,info,debug,trace)  |          |
+| `auth.oidc.issuer_url`        |                   | OAuth2 Client credentials issuer         |          |
+| `auth.oidc.client_id`         |                   | OAuth2 Client credentials: client id     |          |
+| `auth.oidc.client_secret`     |                   | OAuth2 Client credentials: client secret |          |
+| `ttp.epix.base_url`           |                   | E-PIX base url                           | ✓        |
+| `ttp.epix.domain.name`        | test              | E-PIX MPI domain                         |          |
+| `ttp.epix.domain.description` | Test domain       | E-PIX MPI domain description             |          |
+| `ttp.epix.identifier_domain`  | MPI               | E-PIX MPI identifier domain              |          |
+| `ttp.epix.data_source`        | dummy_safe_source | E-PIX id safe source                     |          |
+| `ttp.gpas.base_url`           |                   | gPAS base url                            | ✓        |
+| `ttp.timeout`                 | 120               | Retry timeout                            |          |
 
 ### Environment variables
 
