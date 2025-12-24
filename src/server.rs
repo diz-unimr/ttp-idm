@@ -3,9 +3,14 @@ use crate::config::AppConfig;
 use crate::model;
 use crate::ttp::client::TtpClient;
 use auth::oidc::Oidc as OidcAuth;
+use axum::extract::State;
+use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::{middleware, Router};
+use axum::{middleware, Json, Router};
 use log::info;
+use reqwest::StatusCode;
+use serde::Serialize;
+use shadow_rs::shadow;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
@@ -17,22 +22,48 @@ use utoipa_swagger_ui::{Config, SwaggerUi};
 #[derive(Clone)]
 pub(crate) struct ApiContext {
     pub(crate) client: TtpClient,
+    build: ApiBuild,
 }
+
+#[derive(utoipa::ToSchema, Serialize)]
+struct ApiStatus {
+    name: String,
+    build: ApiBuild,
+    healthy: bool,
+}
+
+#[derive(Clone, utoipa::ToSchema, Serialize)]
+pub(crate) struct ApiBuild {
+    pub(crate) version: String,
+    pub(crate) mode: String,
+    pub(crate) time: String,
+}
+
+shadow!(build);
 
 /// API metadata
 #[utoipa::path(
     get,
-    path = "/",
+    path = "/status",
     responses(
-        (status = 200, description = "TTP ID Management Web API", body = str),
+        (status = 200, body = ApiStatus),
     ),
-    tag = "metadata"
+    tag = "status"
 )]
-async fn root() -> &'static str {
-    "TTP ID Management API"
+#[axum::debug_handler]
+async fn status(State(ctx): State<Arc<ApiContext>>) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(ApiStatus {
+            name: "TTP ID Management API".to_string(),
+            build: ctx.build.clone(),
+            healthy: ctx.client.is_healthy().await,
+        }),
+    )
+        .into_response()
 }
 
-pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
+pub(crate) async fn serve(config: AppConfig, build: ApiBuild) -> anyhow::Result<()> {
     let filter = format!(
         "{}={level},tower_http={level}",
         env!("CARGO_CRATE_NAME"),
@@ -48,7 +79,8 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
     client.setup_domains().await?;
 
     // api state
-    let state = Arc::new(ApiContext { client });
+    let state = Arc::new(ApiContext { client, build });
+
     // auth state
     let auth_state = match config
         .auth
@@ -73,7 +105,7 @@ pub(crate) async fn serve(config: AppConfig) -> anyhow::Result<()> {
 
 fn build_router(api_state: Arc<ApiContext>, auth_state: Option<Arc<OidcAuth>>) -> Router {
     api_route(auth_state)
-        .route("/", get(root))
+        .route("/status", get(status))
         .merge(
             SwaggerUi::new("/swagger-ui")
                 .url("/api-docs/openapi.json", ApiDoc::openapi())
@@ -97,7 +129,7 @@ fn api_route(auth_state: Option<Arc<OidcAuth>>) -> Router<Arc<ApiContext>> {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        root,
+        status,
         api::create,
         api::read,
     ),
@@ -140,6 +172,11 @@ mod tests {
         {
             let state = Arc::new(ApiContext {
                 client: TtpClient::new(&config.ttp).await.unwrap(),
+                build: ApiBuild {
+                    version: "1.0.0".to_string(),
+                    mode: "".to_string(),
+                    time: "".to_string(),
+                },
             });
 
             // test server

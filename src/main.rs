@@ -1,6 +1,8 @@
 use crate::config::AppConfig;
+use crate::server::ApiBuild;
 use anyhow::anyhow;
 use log::{error, info};
+use shadow_rs::shadow;
 
 mod api;
 mod config;
@@ -8,6 +10,8 @@ mod error;
 mod model;
 mod server;
 mod ttp;
+
+shadow!(build);
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -21,7 +25,16 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // run
-    match server::serve(config).await {
+    match server::serve(
+        config,
+        ApiBuild {
+            version: shadow_rs::tag(),
+            mode: shadow_rs::build_channel().to_string(),
+            time: build::BUILD_TIME.to_string(),
+        },
+    )
+    .await
+    {
         Ok(_) => info!("Server stopped"),
         Err(e) => {
             error!("Server stopped: {e}");
