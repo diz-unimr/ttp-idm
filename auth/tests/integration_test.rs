@@ -1,4 +1,4 @@
-use auth::oidc::{Claims, Oidc};
+use auth::oauth::{Claims, Oidc};
 use axum::routing::get;
 use axum::{middleware, Router};
 use axum_test::TestServer;
@@ -137,7 +137,7 @@ async fn setup_test_server_with_jwks(jwks: Option<Value>) -> (TestServer, MockSe
         .route("/", get(|| async { "Hello, World!" }))
         .layer(middleware::from_fn_with_state(
             oidc,
-            auth::oidc::auth_middleware,
+            auth::oauth::auth_middleware,
         ));
     (TestServer::new(router).unwrap(), idp)
 }

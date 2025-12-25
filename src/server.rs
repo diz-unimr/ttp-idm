@@ -2,7 +2,7 @@ use crate::api;
 use crate::config::AppConfig;
 use crate::model;
 use crate::ttp::client::TtpClient;
-use auth::oidc::Oidc as OidcAuth;
+use auth::oauth::Oidc as OidcAuth;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::get;
@@ -119,7 +119,7 @@ fn api_route(auth_state: Option<Arc<OidcAuth>>) -> Router<Arc<ApiContext>> {
     if let Some(auth) = auth_state {
         api::router().layer(middleware::from_fn_with_state(
             auth,
-            auth::oidc::auth_middleware,
+            auth::oauth::auth_middleware,
         ))
     } else {
         api::router()

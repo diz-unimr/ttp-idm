@@ -3,7 +3,7 @@ ARG version_default=v1
 FROM rust:1.92.0-alpine3.23 AS build
 
 RUN set -ex && \
-    apk add --no-progress --no-cache musl-dev openssl-dev openssl-libs-static curl
+    apk add --no-progress --no-cache curl
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock build.rs /app/
