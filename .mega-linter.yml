@@ -6,4 +6,4 @@ MARKDOWN_MARKDOWNLINT_ARGUMENTS: --ignore dev --disable MD024
 COPYPASTE_JSCPD_DISABLE_ERRORS: true
 REPOSITORY_CHECKOV_ARGUMENTS: --skip-path api-docs
 PRE_COMMANDS:
-  - command: "apk add zlib-dev"
+  - command: "apk add zlib-static"
