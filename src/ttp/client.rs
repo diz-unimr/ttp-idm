@@ -24,6 +24,10 @@ pub(crate) struct TtpClient {
 }
 
 impl TtpClient {
+    pub(crate) async fn is_healthy(&self) -> bool {
+        self.test_connection().await.is_ok()
+    }
+
     pub(crate) async fn setup_domains(&self) -> Result<(), anyhow::Error> {
         // epix
         self.setup_epix_domains().await?;
@@ -130,7 +134,6 @@ impl TtpClient {
         let body: String = epix::deactivate_entity_request(identity_id).try_into()?;
         let response = self.send_epix(body).await?;
 
-        // todo: refactor check response
         if !response.status().is_success() {
             let resp_text = response.text().await?;
             let fault = FaultEnvelope::try_from(resp_text.clone())
@@ -146,7 +149,6 @@ impl TtpClient {
         // delete identity
         let body: String = epix::delete_entity_request(identity_id).try_into()?;
         let response = self.send_epix(body).await?;
-        // todo check response
         if !response.status().is_success() {
             let resp_text = response.text().await?;
             let fault = FaultEnvelope::try_from(resp_text.clone())

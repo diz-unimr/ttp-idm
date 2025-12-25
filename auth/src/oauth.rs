@@ -1,5 +1,5 @@
-use crate::oidc::AuthError::Client;
-use async_oidc_jwt_validator::{OidcConfig, OidcValidator};
+use crate::oauth::AuthError::Client;
+use crate::validator::{Config, TokenValidator};
 use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::IntoResponse;
@@ -43,9 +43,8 @@ pub struct Claims {
     pub iss: String,
 }
 
-#[derive(Clone)]
 pub struct Oidc {
-    validator: OidcValidator,
+    validator: TokenValidator,
 }
 
 impl Oidc {
@@ -53,8 +52,12 @@ impl Oidc {
         let discovery: DiscoveryDocument = DiscoveryDocument::new(&issuer_url).await?;
 
         // jwt validation config
-        let validation_config = OidcConfig::new(issuer_url, client_id, discovery.jwks_uri);
-        let validator = OidcValidator::new(validation_config);
+        let config = Config {
+            issuer_url,
+            client_id,
+            jwks_uri: discovery.jwks_uri,
+        };
+        let validator = TokenValidator::new(config);
 
         Ok(Oidc { validator })
     }
