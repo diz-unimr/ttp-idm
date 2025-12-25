@@ -164,31 +164,37 @@ impl Modify for SecurityAddon {
 mod tests {
     use super::*;
     use axum_test::TestServer;
+    use serde_json::json;
     use std::sync::Arc;
 
     #[tokio::test]
-    async fn root_test() {
+    async fn status_test() {
         let config = AppConfig::default();
+        let api_build = ApiBuild {
+            version: "1.0.0".to_string(),
+            mode: "debug".to_string(),
+            time: "2025-12-06 20:12:45 +01:00".to_string(),
+        };
         {
             let state = Arc::new(ApiContext {
                 client: TtpClient::new(&config.ttp).await.unwrap(),
-                build: ApiBuild {
-                    version: "1.0.0".to_string(),
-                    mode: "".to_string(),
-                    time: "".to_string(),
-                },
+                build: api_build.clone(),
             });
 
             // test server
-            let router = build_router(state, None);
+            let router = build_router(state.clone(), None);
             let server = TestServer::new(router).unwrap();
 
             // send request
-            let response = server.get("/").await;
+            let response = server.get("/status").await;
 
             // assert
             response.assert_status_ok();
-            response.assert_text("TTP ID Management API");
+            response.assert_json(&json!(ApiStatus {
+                name: "TTP ID Management API".to_string(),
+                build: api_build,
+                healthy: false,
+            }));
         }
     }
 }
