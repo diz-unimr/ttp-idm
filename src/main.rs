@@ -28,8 +28,8 @@ async fn main() -> anyhow::Result<()> {
     match server::serve(
         config,
         ApiBuild {
-            version: shadow_rs::tag(),
-            mode: shadow_rs::build_channel().to_string(),
+            version: build::TAG.to_string(),
+            mode: build::BUILD_RUST_CHANNEL.to_string(),
             time: build::BUILD_TIME.to_string(),
         },
     )
