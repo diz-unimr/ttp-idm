@@ -3,14 +3,18 @@ ARG version_default=v1
 FROM rust:1.92.0-alpine3.23 AS build
 
 RUN set -ex && \
-    apk add --no-progress --no-cache curl
+    apk add --no-progress --no-cache curl git
 
 WORKDIR /app
+
+COPY ./app.yaml ./
 COPY Cargo.toml Cargo.lock build.rs /app/
 COPY ./src /app/src
 
 COPY ./auth/Cargo.toml ./auth/Cargo.lock /app/auth/
 COPY ./auth/src /app/auth/src
+# copy repository for build metadata
+COPY ./.git /app/.git
 
 RUN cargo build --release
 

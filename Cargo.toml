@@ -28,10 +28,10 @@ uuid = { version = "1.18.1", features = ["v4", "serde"] }
 axum-test = "18.2.1"
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
-shadow-rs = "1.5.0"
+shadow-rs = "1.7.0"
 
 [dev-dependencies]
 httpmock = "0.8.1"
 
 [build-dependencies]
-shadow-rs = "1.5.0"
+shadow-rs = "1.7.0"
