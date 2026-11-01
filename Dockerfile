@@ -1,6 +1,6 @@
 ARG version_default=v1
 
-FROM rust:1.92.0-alpine3.23 AS build
+FROM rust:1.99.1-alpine3.23 AS build
 
 RUN set -ex && \
     apk add --no-progress --no-cache curl git
@@ -18,7 +18,7 @@ COPY ./.git /app/.git
 
 RUN cargo build --release
 
-FROM alpine:3.23 AS run
+FROM alpine:3.24 AS run
 
 RUN apk add --no-progress --no-cache tzdata curl jq
 
