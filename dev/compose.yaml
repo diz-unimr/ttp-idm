@@ -16,7 +16,7 @@ services:
       - "8081:8080"
 
   epix:
-    image: mosaicgreifswald/epix:2025.1.2
+    image: mosaicgreifswald/epix:2025.2.1
     depends_on:
       - mysql
     ports:
